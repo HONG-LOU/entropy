@@ -25,6 +25,12 @@ func main() {
 		err = showStatus(os.Args[2:])
 	case "mine-one":
 		err = mineOne(os.Args[2:])
+	case "history":
+		err = showHistory(os.Args[2:])
+	case "wallet-backup":
+		err = backupWallet(os.Args[2:])
+	case "wallet-migrate":
+		err = migrateWallet(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -41,15 +47,29 @@ func runNode(arguments []string) error {
 	listen := flags.String("listen", node.DefaultListenAddress, "P2P listen address")
 	peer := flags.String("peer", "", "peer URL, for example http://192.168.1.20:47821")
 	mine := flags.Bool("mine", false, "start mining immediately")
+	pruneDepth := flags.Uint64("prune-depth", 0, "retain this many recent block bodies (0 = archive)")
+	noDiscovery := flags.Bool("no-discovery", false, "disable LAN multicast peer discovery")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
-	service, err := node.New(node.Config{DataDirectory: *data, ListenAddress: *listen})
+	pruneDepthSet := false
+	flags.Visit(func(item *flag.Flag) {
+		if item.Name == "prune-depth" {
+			pruneDepthSet = true
+		}
+	})
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	service, err := node.NewContext(ctx, node.Config{
+		DataDirectory:    *data,
+		ListenAddress:    *listen,
+		PruneDepth:       *pruneDepth,
+		PruneDepthSet:    pruneDepthSet,
+		DisableDiscovery: *noDiscovery,
+	})
 	if err != nil {
 		return err
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	if err := service.Start(ctx); err != nil {
 		return err
 	}
@@ -112,6 +132,71 @@ func mineOne(arguments []string) error {
 	return nil
 }
 
+func showHistory(arguments []string) error {
+	flags := flag.NewFlagSet("history", flag.ContinueOnError)
+	data := flags.String("data", "", "data directory")
+	limit := flags.Int("limit", 20, "maximum history rows")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	service, err := node.New(node.Config{DataDirectory: *data, ListenAddress: "127.0.0.1:0"})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = service.Close(context.Background()) }()
+	history, err := service.TransactionHistory(*limit)
+	if err != nil {
+		return err
+	}
+	for _, transaction := range history {
+		state := fmt.Sprintf("%d confirmations", transaction.Confirmations)
+		if transaction.Pending {
+			state = "pending"
+		}
+		fmt.Printf("%s  received=%s sent=%s  %s\n", transaction.ID, transaction.Received, transaction.Sent, state)
+	}
+	return nil
+}
+
+func backupWallet(arguments []string) error {
+	flags := flag.NewFlagSet("wallet-backup", flag.ContinueOnError)
+	data := flags.String("data", "", "data directory")
+	output := flags.String("output", "", "destination .entwallet file")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if *output == "" {
+		return fmt.Errorf("--output is required")
+	}
+	password := os.Getenv("ENTROPY_WALLET_PASSWORD")
+	if password == "" {
+		return fmt.Errorf("ENTROPY_WALLET_PASSWORD is required")
+	}
+	service, err := node.New(node.Config{DataDirectory: *data, ListenAddress: "127.0.0.1:0"})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = service.Close(context.Background()) }()
+	return service.ExportWalletBackup(*output, password)
+}
+
+func migrateWallet(arguments []string) error {
+	flags := flag.NewFlagSet("wallet-migrate", flag.ContinueOnError)
+	data := flags.String("data", "", "data directory")
+	output := flags.String("output", "", "required portable .entwallet backup")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if *output == "" {
+		return fmt.Errorf("--output is required")
+	}
+	password := os.Getenv("ENTROPY_WALLET_PASSWORD")
+	if password == "" {
+		return fmt.Errorf("ENTROPY_WALLET_PASSWORD is required")
+	}
+	return node.MigrateLegacyWallet(*data, *output, password)
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: entropy <node|status|mine-one> [options]")
+	fmt.Fprintln(os.Stderr, "usage: entropy <node|status|mine-one|history|wallet-backup|wallet-migrate> [options]")
 }

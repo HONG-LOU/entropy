@@ -1,13 +1,21 @@
 package store
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"entropy/internal/core"
+)
+
+const (
+	maxLegacyStateBytes  = 256 << 20
+	maxLegacyWalletBytes = 64 << 10
+	maxLegacyPeersBytes  = 1 << 20
 )
 
 type Store struct {
@@ -18,75 +26,56 @@ func New(directory string) *Store {
 	return &Store{directory: directory}
 }
 
-func DefaultDirectory() (string, error) {
-	base, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("find user config directory: %w", err)
-	}
-	return filepath.Join(base, core.ChainName), nil
-}
-
 func (s *Store) Directory() string {
 	return s.directory
 }
 
-func (s *Store) LoadOrCreateState() (*core.State, error) {
+// LoadLegacyState reads the v1 JSON chain without creating a replacement when
+// it is absent. Database migration relies on this distinction.
+func (s *Store) LoadLegacyState() (*core.State, bool, error) {
 	path := filepath.Join(s.directory, "chain.json")
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		state := core.NewState()
-		if err := s.SaveState(state); err != nil {
-			return nil, err
-		}
-		return state, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read chain state: %w", err)
-	}
 	var state core.State
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, fmt.Errorf("decode chain state: %w", err)
+	found, err := readStrictJSONFile(path, maxLegacyStateBytes, &state)
+	if err != nil {
+		return nil, false, fmt.Errorf("read chain state: %w", err)
 	}
-	if err := state.Validate(); err != nil {
-		return nil, fmt.Errorf("validate chain state: %w", err)
+	if !found {
+		return nil, false, nil
 	}
-	return &state, nil
+	if err := state.ValidateConfirmed(); err != nil {
+		return nil, false, fmt.Errorf("validate chain state: %w", err)
+	}
+	if len(state.Pending) > core.MaxPendingTransactions {
+		return nil, false, fmt.Errorf("validate chain state: pending transaction limit exceeded")
+	}
+	return &state, true, nil
 }
 
-func (s *Store) SaveState(state *core.State) error {
+func (s *Store) SaveLegacyState(state *core.State) error {
 	if err := state.Validate(); err != nil {
 		return fmt.Errorf("refuse to save invalid chain state: %w", err)
 	}
 	return writeJSONAtomic(filepath.Join(s.directory, "chain.json"), state, 0o600)
 }
 
-func (s *Store) LoadOrCreateWallet() (*core.Wallet, error) {
+// LoadLegacyWallet reads wallet.json without ever generating a new key.
+func (s *Store) LoadLegacyWallet() (*core.Wallet, bool, error) {
 	path := filepath.Join(s.directory, "wallet.json")
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		wallet, err := core.NewWallet()
-		if err != nil {
-			return nil, err
-		}
-		if err := s.SaveWallet(wallet); err != nil {
-			return nil, err
-		}
-		return wallet, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read wallet: %w", err)
-	}
 	var wallet core.Wallet
-	if err := json.Unmarshal(data, &wallet); err != nil {
-		return nil, fmt.Errorf("decode wallet: %w", err)
+	found, err := readStrictJSONFile(path, maxLegacyWalletBytes, &wallet)
+	if err != nil {
+		return nil, false, fmt.Errorf("read wallet: %w", err)
+	}
+	if !found {
+		return nil, false, nil
 	}
 	if err := wallet.Validate(); err != nil {
-		return nil, fmt.Errorf("validate wallet: %w", err)
+		return nil, false, fmt.Errorf("validate wallet: %w", err)
 	}
-	return &wallet, nil
+	return &wallet, true, nil
 }
 
-func (s *Store) SaveWallet(wallet *core.Wallet) error {
+func (s *Store) SaveLegacyWallet(wallet *core.Wallet) error {
 	if err := wallet.Validate(); err != nil {
 		return fmt.Errorf("refuse to save invalid wallet: %w", err)
 	}
@@ -94,23 +83,70 @@ func (s *Store) SaveWallet(wallet *core.Wallet) error {
 }
 
 func (s *Store) LoadPeers() ([]string, error) {
-	path := filepath.Join(s.directory, "peers.json")
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return []string{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read peers: %w", err)
-	}
-	var peers []string
-	if err := json.Unmarshal(data, &peers); err != nil {
-		return nil, fmt.Errorf("decode peers: %w", err)
-	}
-	return peers, nil
+	peers, _, err := s.LoadLegacyPeers()
+	return peers, err
 }
 
-func (s *Store) SavePeers(peers []string) error {
+// LoadLegacyPeers reads the v1 peer list without creating it.
+func (s *Store) LoadLegacyPeers() ([]string, bool, error) {
+	path := filepath.Join(s.directory, "peers.json")
+	var peers []string
+	found, err := readStrictJSONFile(path, maxLegacyPeersBytes, &peers)
+	if err != nil {
+		return nil, false, fmt.Errorf("read peers: %w", err)
+	}
+	if !found {
+		return []string{}, false, nil
+	}
+	return peers, true, nil
+}
+
+func (s *Store) SaveLegacyPeers(peers []string) error {
 	return writeJSONAtomic(filepath.Join(s.directory, "peers.json"), peers, 0o600)
+}
+
+// ArchiveLegacy renames a successfully migrated v1 data file and refuses to
+// overwrite an earlier backup.
+func (s *Store) ArchiveLegacy(name string) error {
+	if name != "chain.json" && name != "peers.json" {
+		return fmt.Errorf("unsupported legacy file %q", name)
+	}
+	source := filepath.Join(s.directory, name)
+	destination := source + ".migrated.bak"
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("inspect legacy %s: %w", name, err)
+	}
+	if _, err := os.Stat(destination); err == nil {
+		return fmt.Errorf("legacy backup already exists: %s", destination)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect legacy backup %s: %w", name, err)
+	}
+	if err := os.Rename(source, destination); err != nil {
+		return fmt.Errorf("archive migrated %s: %w", name, err)
+	}
+	return nil
+}
+
+// RemoveMigratedWallet deletes the legacy plaintext wallet only after the
+// caller has independently verified local and portable encrypted copies.
+func (s *Store) RemoveMigratedWallet() error {
+	path := filepath.Join(s.directory, "wallet.json")
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect migrated wallet: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("refuse to remove non-regular legacy wallet")
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove migrated plaintext wallet: %w", err)
+	}
+	return nil
 }
 
 func writeJSONAtomic(path string, value any, mode os.FileMode) error {
@@ -147,4 +183,45 @@ func writeJSONAtomic(path string, value any, mode os.FileMode) error {
 		return fmt.Errorf("replace %s: %w", filepath.Base(path), err)
 	}
 	return nil
+}
+
+func readStrictJSONFile(path string, maximum int64, value any) (bool, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !info.Mode().IsRegular() {
+		return false, fmt.Errorf("%s is not a regular file", filepath.Base(path))
+	}
+	if info.Size() <= 0 || info.Size() > maximum {
+		return false, fmt.Errorf("%s size is outside the allowed range", filepath.Base(path))
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maximum+1))
+	if err != nil {
+		return false, err
+	}
+	if int64(len(data)) > maximum {
+		return false, fmt.Errorf("%s exceeds the allowed size", filepath.Base(path))
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return false, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return false, fmt.Errorf("%s contains trailing JSON", filepath.Base(path))
+		}
+		return false, err
+	}
+	return true, nil
 }

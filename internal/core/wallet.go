@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 type Wallet struct {
@@ -50,6 +51,13 @@ func ValidateAddress(address string) error {
 		return fmt.Errorf("invalid ENT address checksum")
 	}
 	return nil
+}
+
+// AddressesEqual compares validated ENT addresses by their encoded bytes.
+// Hex payloads are case-insensitive, while the ent1 network prefix remains
+// canonical and case-sensitive through ValidateAddress.
+func AddressesEqual(left, right string) bool {
+	return ValidateAddress(left) == nil && ValidateAddress(right) == nil && strings.EqualFold(left, right)
 }
 
 func (w *Wallet) Validate() error {

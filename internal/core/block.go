@@ -6,12 +6,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
 const genesisTimestamp int64 = 1783900800
+
+const MaxMiningWorkers = 1_024
 
 var zeroHash = strings.Repeat("0", 64)
 
@@ -60,22 +64,83 @@ func (b Block) HasValidWork() bool {
 }
 
 func mineBlock(ctx context.Context, block Block) (Block, error) {
-	for nonce := uint64(0); ; nonce++ {
-		if nonce%100_000 == 0 {
-			select {
-			case <-ctx.Done():
-				return Block{}, ctx.Err()
-			default:
+	return MineBlockWithWorkers(ctx, block, runtime.GOMAXPROCS(0))
+}
+
+func MineBlockWithWorkers(ctx context.Context, block Block, workers int) (Block, error) {
+	if workers <= 0 {
+		return Block{}, fmt.Errorf("mining worker count must be positive")
+	}
+	if workers > MaxMiningWorkers {
+		return Block{}, fmt.Errorf("mining worker count exceeds %d", MaxMiningWorkers)
+	}
+	if err := ctx.Err(); err != nil {
+		return Block{}, err
+	}
+	workContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	found := make(chan Block, 1)
+	done := make(chan struct{})
+	var wait sync.WaitGroup
+	wait.Add(workers)
+	step := uint64(workers)
+	for worker := 0; worker < workers; worker++ {
+		start := uint64(worker)
+		go func() {
+			defer wait.Done()
+			candidate := block
+			nonce := start
+			iterations := uint64(0)
+			for {
+				if iterations&4_095 == 0 {
+					select {
+					case <-workContext.Done():
+						return
+					default:
+					}
+				}
+				candidate.Nonce = nonce
+				candidate.Hash = candidate.ComputeHash()
+				if candidate.HasValidWork() {
+					select {
+					case found <- candidate:
+						cancel()
+					case <-workContext.Done():
+					}
+					return
+				}
+				if nonce > math.MaxUint64-step {
+					return
+				}
+				nonce += step
+				iterations++
 			}
+		}()
+	}
+	go func() {
+		wait.Wait()
+		close(done)
+	}()
+
+	select {
+	case mined := <-found:
+		cancel()
+		<-done
+		return mined, nil
+	case <-ctx.Done():
+		cancel()
+		<-done
+		return Block{}, ctx.Err()
+	case <-done:
+		select {
+		case mined := <-found:
+			return mined, nil
+		default:
 		}
-		block.Nonce = nonce
-		block.Hash = block.ComputeHash()
-		if block.HasValidWork() {
-			return block, nil
+		if err := ctx.Err(); err != nil {
+			return Block{}, err
 		}
-		if nonce == math.MaxUint64 {
-			return Block{}, fmt.Errorf("nonce space exhausted")
-		}
+		return Block{}, fmt.Errorf("nonce space exhausted")
 	}
 }
 
@@ -105,6 +170,10 @@ func expectedDifficulty(blocks []Block, nextHeight uint64) uint8 {
 		return clampDifficulty(int(previous) - 1)
 	}
 	return previous
+}
+
+func ExpectedDifficulty(blocks []Block, nextHeight uint64) uint8 {
+	return expectedDifficulty(blocks, nextHeight)
 }
 
 func clampDifficulty(difficulty int) uint8 {
@@ -163,6 +232,10 @@ func merkleRoot(transactions []Transaction) string {
 	return hex.EncodeToString(level[0])
 }
 
+func MerkleRoot(transactions []Transaction) string {
+	return merkleRoot(transactions)
+}
+
 func leadingZeroBits(value []byte) int {
 	count := 0
 	for _, b := range value {
@@ -185,4 +258,12 @@ func nextTimestamp(blocks []Block) int64 {
 		return minimum
 	}
 	return now
+}
+
+func MineBlock(ctx context.Context, block Block) (Block, error) {
+	return MineBlockWithWorkers(ctx, block, runtime.GOMAXPROCS(0))
+}
+
+func NextTimestamp(blocks []Block) int64 {
+	return nextTimestamp(blocks)
 }

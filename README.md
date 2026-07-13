@@ -1,135 +1,263 @@
 # Entropy (ENT)
 
-Entropy is a compact proof-of-work blockchain packaged as a Windows desktop node.
-Open the app and the wallet, ledger validator, transaction relay, and peer server
-start in the same process.
+Entropy v0.2 is a compact proof-of-work **public testnet** packaged as a
+Windows desktop full node. Starting one application starts the wallet, SQLite
+ledger, block and transaction validator, peer synchronization, relay server,
+and optional miner in the same process. It does not require a separate database
+server, browser tab, or background daemon.
 
-> This is an educational MVP. It uses real signatures and proof of work, but it
-> has not been audited and must not hold assets with real-world value.
+> Entropy has not received an independent security or consensus audit. ENT is
+> testnet currency only. Do not buy it, sell it, promise redemption, or use it
+> to hold anything with real-world value. This repository does not claim
+> mainnet or production-security readiness.
 
-## What works
+Repository: <https://github.com/HONG-LOU/entropy>
 
-- P-256 wallet generation and checksummed `ent1...` addresses
-- UTXO transactions, change, fees, signatures, and double-spend rejection
-- SHA-256 proof of work and cumulative-work chain selection
-- Pending transaction propagation in seconds over configured peers
-- 10-second target block interval and persistent local chain state
-- Exact 2,000,000 ENT maximum supply released over 31,536,000 reward blocks
-- Single-file Wails desktop app plus a headless CLI node
-- Atomic JSON persistence and full replay validation on startup
+## What v0.2 includes
 
-## Run the desktop node
+- A Wails desktop node with send, receive, mining, peer, history, wallet
+  recovery, database, and pruning controls.
+- A UTXO ledger in SQLite with WAL, `synchronous=FULL`, indexed balances and
+  history, persistent mempool and peers, per-block undo records, atomic reorgs,
+  and startup integrity checks.
+- Header-first incremental synchronization over bounded HTTP batches. The old
+  whole-chain `/v1/state` exchange is removed.
+- WebSocket transaction and block broadcast for low-latency relay, with HTTP
+  broadcast as a fallback delivery path.
+- Automatic LAN discovery plus persistent manual peers, connection limits,
+  and exponential retry backoff.
+- A Windows DPAPI-protected local wallet, 24-word BIP39 recovery for newly
+  created wallets, and portable Argon2id/XChaCha20-Poly1305 `.entwallet`
+  backups.
+- Archive and pruned storage modes. Both validate incoming blocks locally;
+  archive nodes additionally keep and serve all historical bodies.
+- Automatic, verified migration of v0.1 `chain.json` and `peers.json`, plus a
+  mandatory encrypted migration path for the old plaintext `wallet.json`.
+- A headless CLI using the same node, consensus, wallet, ledger, and P2P code.
+- A portable desktop executable and an NSIS per-user installer build.
 
-The packaged Windows application is:
+## How many nodes are required?
+
+One node is enough to create a wallet, mine, send transactions to itself, and
+validate its local chain. Two nodes are the practical minimum for a network:
+they can relay a payment, synchronize blocks, and resolve a fork by cumulative
+work. There is no coordinator and no fixed quorum.
+
+For a useful public testnet, run several independently operated nodes. At least
+one must be reachable from the internet so outbound-only nodes behind NAT have
+somewhere to connect. A node behind NAT is still a full validating and relaying
+node; it simply cannot accept unsolicited inbound connections.
+
+## Run the Windows desktop node
+
+Use an artifact from the
+[GitHub Releases page](https://github.com/HONG-LOU/entropy/releases), or run the
+portable executable produced locally at:
 
 ```text
 D:\Entropy\build\bin\Entropy.exe
 ```
 
-Double-click it. The first launch creates a wallet and chain data under:
+The NSIS build is the `*installer*.exe` artifact in the same directory. The
+installer is the simplest distribution for other Windows users; the portable
+EXE can be launched directly. Windows 10/11 x64 and Microsoft WebView2 Runtime
+are required. The installer build downloads the WebView2 bootstrapper when
+needed. Releases are currently unsigned, so Windows SmartScreen may show an
+unknown-publisher warning.
+
+On first launch the application:
+
+1. Creates a new P-256 wallet and protects it with Windows user-scope DPAPI.
+2. Creates and verifies the SQLite ledger.
+3. Listens on `0.0.0.0:47821` for peers, or chooses a free port if another
+   program already owns the default desktop port.
+4. Announces itself on the local network.
+5. Synchronizes configured and discovered peers.
+
+Mining is off by default. Opening the application always runs a validating
+node; mining begins only after **Start mining** or **Mine one block**.
+
+The default data directory for a clean installation is:
 
 ```text
-%APPDATA%\Entropy
+%LOCALAPPDATA%\Entropy
 ```
 
-The desktop window requires Microsoft WebView2 Runtime. Current Windows 10/11
-installations normally already include it.
+The per-user uninstaller removes the application but deliberately keeps this
+directory, including the wallet and chain. Back it up before deleting it
+manually. An existing v0.1/v0.2 data directory under `%APPDATA%\Entropy` is
+detected and reused so an upgrade never silently switches wallets. Do not
+allow roaming-profile software to merge that live SQLite database between PCs.
 
-The app listens for peers on TCP port `47821`. Windows Firewall may ask whether
-to allow access. A second user can add the first user's reachable node URL in
-the Peers panel, for example:
+The wallet screen will ask you to record the 24-word phrase or export an
+encrypted `.entwallet` backup. Do that before mining or receiving funds. The
+chain database can be downloaded again; the wallet cannot.
+
+See [Operations](docs/operations.md) for multi-node examples, firewall and NAT
+setup, backups, migration, pruning, and troubleshooting.
+
+## Transfer and confirmation speed
+
+A valid transfer enters the sender's local mempool immediately and is broadcast
+to connected peers over WebSocket. A healthy LAN peer will usually see it in
+well under one second, but relay is not confirmation. Consensus targets one
+proof-of-work block every 10 seconds:
 
 ```text
-http://192.168.1.20:47821
+Mempool relay          usually below 1 second on a healthy LAN
+1 confirmation         target about 10 seconds
+6 confirmations        target about 1 minute
 ```
 
-Mining is off by default. Starting the app always runs a validating/relaying
-node; mining starts only after pressing **Start mining**.
-
-Back up `wallet.json` before using a persistent wallet. Anyone with that file
-can spend the wallet's ENT. There is no password encryption in this MVP.
-
-## Confirmation speed
-
-The sender first commits a valid transfer to its local pending pool, then relays
-to configured peers concurrently. A healthy LAN peer normally receives it in
-well under a second, but the app does not call that a confirmation. The target
-is one proof-of-work block every 10 seconds:
-
-```text
-Broadcast receipt       typically < 1 second on a LAN
-1 confirmation          target about 10 seconds
-6 confirmations         target about 1 minute
-```
-
-Fast proof-of-work chains have more short forks than Bitcoin. Six ENT
+Actual time depends on miners, hash rate, peer connectivity, and forks. A
+10-second testnet has a higher stale-block risk than Bitcoin, and six ENT
 confirmations do not provide Bitcoin-level economic security.
 
-## Monetary policy
+## Monetary and consensus parameters
 
-There is no premine. Height zero is a fixed, reward-free genesis block. Amounts
-use eight decimal places and integer arithmetic only.
+Entropy has no premine. Height zero is a fixed reward-free genesis block.
+Amounts use eight decimal places and integer arithmetic.
 
 ```text
-Maximum supply                  2,000,000.00000000 ENT
-Target block spacing            10 seconds
-Reward-bearing blocks           31,536,000
-Expected emission duration      3,650 days (about 10 years)
-Blocks 1..12,512,000            0.06341959 ENT
-Blocks 12,512,001..31,536,000   0.06341958 ENT
-Later blocks                    fees only
+Network identity                  entropy-testnet-v3
+Maximum supply                    2,000,000.00000000 ENT
+Atomic units per ENT              100,000,000
+Target block spacing              10 seconds
+Reward-bearing heights            1 through 31,536,000
+Target emission duration          3,650 days (about 10 years)
+Heights 1..12,512,000             0.06341959 ENT
+Heights 12,512,001..31,536,000    0.06341958 ENT
+Later heights                     transaction fees only
+Coinbase maturity                 100 blocks, enforced from height 100
+Maximum block body                1 MiB
+Fork choice                       greatest cumulative proof of work
 ```
 
-The one-atomic-unit difference distributes the division remainder. The two
-reward ranges add up to exactly `200,000,000,000,000` atomic units.
+The one-atomic-unit reward difference distributes the integer division
+remainder. The reward schedule sums to exactly `200,000,000,000,000` atomic
+units at height 31,536,000. Fees move existing ENT and do not increase supply.
 
-Ten years is the target implied by block height and 10-second spacing, not a
-wall-clock guarantee. The DAA can raise difficulty up to 255 leading zero bits,
-but a public launch still requires long-running hash-rate and timestamp tests.
+"Ten years" means 31,536,000 target intervals of 10 seconds, not a wall-clock
+guarantee. Beginning at spending height 100, a coinbase output must be 100
+blocks old. The activation boundary preserves replay compatibility with the
+published v0.1 testnet history.
 
-## Develop
+## Run the CLI
 
-Prerequisites: Go 1.25+, Node.js 22+, Wails v2, and WebView2.
+Build the headless executable or use `go run`:
+
+```powershell
+go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
+
+# Archive node, automatic LAN discovery enabled
+.\build\bin\entropy-cli.exe node --data .\data\node-a --listen 0.0.0.0:47821 --mine
+
+# Second node on the same computer
+.\build\bin\entropy-cli.exe node --data .\data\node-b --listen 127.0.0.1:47822 `
+  --peer http://127.0.0.1:47821
+
+# Pruned node retaining the newest 20,000 complete block bodies
+.\build\bin\entropy-cli.exe node --data .\data\node-c --listen 0.0.0.0:47823 `
+  --peer http://127.0.0.1:47821 --prune-depth 20000
+```
+
+Available commands are:
+
+```text
+node            run a node; optionally mine, prune, add a peer, or disable LAN discovery
+status          print wallet, height, peer, and issuance status
+mine-one        mine exactly one block
+history         print wallet transaction history
+wallet-backup   create a password-encrypted portable backup
+wallet-migrate  migrate a v0.1 plaintext wallet before startup
+```
+
+Commands that open a data directory take its exclusive `node.lock`. Stop the
+desktop app or running CLI node before using another command against the same
+directory. Full command examples are in [Operations](docs/operations.md#cli-reference).
+
+## Public connectivity
+
+- Allow inbound TCP `47821` in Windows Firewall for the desktop node.
+- On a home router, forward external TCP `47821` to the node computer's TCP
+  `47821` if you want to accept internet peers.
+- Do not forward UDP `47822`; it is local multicast discovery only.
+- Give peers a reachable base URL such as `http://203.0.113.20:47821`.
+- If your ISP uses carrier-grade NAT, port forwarding will not make the node
+  reachable. You can still connect outbound to a public node.
+
+Entropy v0.2 does not include public seed infrastructure or automatic NAT
+traversal. Manual public peers are therefore required outside the LAN. P2P is
+plain HTTP/WebSocket unless the operator supplies a TLS reverse proxy; it has
+no peer authentication.
+
+## Storage modes
+
+Archive mode is the default (`--prune-depth 0`). It keeps headers, bodies,
+transaction data, indexes, UTXOs, and undo records, so it can serve historical
+blocks and handle any reorg available in its local history.
+
+Pruned mode retains every header, the current UTXO set, transaction/address
+indexes, mempool, and peer records, but permanently deletes old block bodies,
+old transaction bodies, and old undo data outside the configured horizon. It
+still validates new blocks and transactions. It cannot serve deleted bodies or
+reorganize below its prune horizon; recovery requires resynchronizing from an
+archive peer. Switching back to archive mode does not recreate deleted data.
+
+For a small personal desktop node use pruned mode; for public bootstrap,
+historical service, debugging, and maximum reorg tolerance use archive mode.
+
+## Upgrade from v0.1
+
+Keep the entire existing Entropy data directory backed up before upgrading.
+For v0.1 this is normally `%APPDATA%\Entropy`; the dashboard shows the active
+v0.2 database path.
+
+- `chain.json` is fully validated, imported transaction by transaction into
+  SQLite, checked against its old tip, then renamed to
+  `chain.json.migrated.bak`.
+- `peers.json` is imported into SQLite and renamed to
+  `peers.json.migrated.bak`.
+- A plaintext `wallet.json` blocks node startup until the desktop migration
+  flow or `wallet-migrate` creates both a verified DPAPI `wallet.vault` and a
+  verified password-protected `.entwallet` backup. The plaintext file is
+  removed only after both copies pass verification.
+- If legacy and SQLite tips disagree, startup fails without replacing either
+  copy.
+
+Legacy wallets preserve their original address but cannot be assigned a new
+recovery phrase. Their portable `.entwallet` backup is therefore essential.
+
+## Build and verify
+
+Prerequisites: Go 1.26.5, Node.js 22+, Wails v2.13.0, WebView2, and NSIS for
+the installer. The patch-level Go pin includes standard-library security fixes
+used by the public network stack.
 
 ```powershell
 cd D:\Entropy
 go test ./...
-npm --prefix frontend install
+go vet ./...
+npm --prefix frontend ci
 wails dev
 ```
 
-Build the Windows executable:
+Create the portable EXE, NSIS installer, and `SHA256SUMS.txt`:
 
 ```powershell
 .\scripts\build.ps1
 ```
 
-Run a headless node:
+The build script runs Go tests and vet first. Current release artifacts are not
+Authenticode-signed and builds are not yet reproducible.
 
-```powershell
-go run .\cmd\entropy node --data .\data\node-a --listen 0.0.0.0:47821 --mine
-```
+## Documentation
 
-Run another node on the same computer:
+- [Architecture](docs/architecture.md)
+- [Node operations and wallet recovery](docs/operations.md)
+- [Protocol v3](docs/protocol.md)
+- [Roadmap](docs/roadmap.md)
+- [Security policy and boundaries](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
-```powershell
-go run .\cmd\entropy node --data .\data\node-b --listen 127.0.0.1:47822 --peer http://127.0.0.1:47821
-```
-
-## MVP limits
-
-- Peers are added manually; there is no public seed service, NAT traversal, or
-  automatic internet discovery yet.
-- P2P messages use HTTP without transport encryption or peer authentication.
-- The chain uses a compact leading-zero-bit difficulty rule, not Bitcoin's
-  production target encoding or a battle-tested fast-chain DAA.
-- State is a replay-validated JSON file. Ten years of 10-second blocks requires
-  a database, indexes, snapshots, and pruning before public launch.
-- Coinbase outputs have no maturity period in this version.
-- Wallet keys use standard-library P-256 rather than Bitcoin's secp256k1.
-- There is no wallet encryption, recovery phrase, transaction fee market,
-  hostile-network hardening, protocol upgrade mechanism, or security audit.
-- Release binaries are not Authenticode-signed in this MVP.
-
-See [docs/architecture.md](docs/architecture.md) for the design and
-[docs/roadmap.md](docs/roadmap.md) for the path from MVP to a public testnet.
+Entropy is licensed under the [MIT License](LICENSE).

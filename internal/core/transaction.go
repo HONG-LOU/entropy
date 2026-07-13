@@ -58,7 +58,7 @@ func BuildTransaction(wallet *Wallet, to string, amount, fee uint64, utxo UTXO) 
 	}
 	candidates := make([]candidate, 0)
 	for outpoint, output := range utxo {
-		if output.Address == wallet.Address {
+		if AddressesEqual(output.Address, wallet.Address) {
 			candidates = append(candidates, candidate{outpoint: outpoint, output: output})
 		}
 	}
@@ -214,7 +214,7 @@ func validateRegularTransaction(tx Transaction, utxo UTXO) (uint64, error) {
 		if !exists {
 			return 0, fmt.Errorf("input %s:%d is missing or already spent", input.TxID, input.OutputIndex)
 		}
-		if AddressFromPublicKey(input.PublicKey) != previousOutput.Address {
+		if !AddressesEqual(AddressFromPublicKey(input.PublicKey), previousOutput.Address) {
 			return 0, fmt.Errorf("input %d public key does not own output", i)
 		}
 		x, y := elliptic.Unmarshal(elliptic.P256(), input.PublicKey)
@@ -245,6 +245,10 @@ func validateRegularTransaction(tx Transaction, utxo UTXO) (uint64, error) {
 	return inputTotal - outputTotal, nil
 }
 
+func ValidateRegularTransaction(tx Transaction, utxo UTXO) (uint64, error) {
+	return validateRegularTransaction(tx, utxo)
+}
+
 func validateCoinbase(tx Transaction, maximum uint64) error {
 	if !tx.Coinbase || len(tx.Inputs) != 0 {
 		return fmt.Errorf("invalid coinbase transaction")
@@ -266,6 +270,14 @@ func validateCoinbase(tx Transaction, maximum uint64) error {
 		return fmt.Errorf("coinbase reward must equal subsidy plus fees")
 	}
 	return nil
+}
+
+func ValidateCoinbase(tx Transaction, maximum uint64) error {
+	return validateCoinbase(tx, maximum)
+}
+
+func EncodedTransactionSize(tx Transaction) int {
+	return tx.encodedSize()
 }
 
 func (tx Transaction) encodedSize() int {

@@ -29,7 +29,13 @@ func main() {
 		AssetServer:       &assetserver.Options{Assets: assets},
 		OnStartup:         app.startup,
 		OnShutdown:        app.shutdown,
-		Bind:              []interface{}{app},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "d959ac6b-bfbc-478f-9aa1-43b06a52f76b",
+			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
+				app.focusWindow()
+			},
+		},
+		Bind: []interface{}{app},
 	})
 	if err != nil {
 		log.Fatal(err)

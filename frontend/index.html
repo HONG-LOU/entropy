@@ -1,12 +1,15 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#171b1a" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'self'"
+    />
     <link rel="icon" href="data:," />
-    <title>Entropy</title>
+    <title>Entropy Node</title>
   </head>
   <body>
     <div id="app">
@@ -18,115 +21,373 @@
             <span>ENT desktop node</span>
           </div>
         </div>
-        <div class="node-state">
+        <div class="node-state" aria-live="polite">
           <span class="status-dot" id="status-dot"></span>
-          <span id="node-state-label">Connecting</span>
+          <span id="node-state-label">Starting</span>
           <code id="listen-address">--</code>
         </div>
       </header>
 
       <main class="workspace">
-        <section class="wallet-strip" aria-labelledby="wallet-heading">
+        <nav class="view-tabs" aria-label="Node views">
+          <button class="view-tab active" type="button" data-view="overview">
+            <i data-lucide="layout-dashboard"></i><span>Overview</span>
+          </button>
+          <button class="view-tab" type="button" data-view="transactions">
+            <i data-lucide="history"></i><span>Transactions</span>
+          </button>
+          <button class="view-tab" type="button" data-view="network">
+            <i data-lucide="network"></i><span>Network</span>
+          </button>
+          <button class="view-tab" type="button" data-view="wallet">
+            <i data-lucide="shield-check"></i><span>Wallet</span>
+          </button>
+          <button class="view-tab" type="button" data-view="diagnostics">
+            <i data-lucide="database"></i><span>Diagnostics</span>
+          </button>
+        </nav>
+
+        <aside class="security-alert" id="backup-alert" hidden>
+          <span class="alert-icon"><i data-lucide="key-round"></i></span>
           <div>
-            <p class="eyebrow" id="wallet-heading">Wallet balance</p>
-            <div class="balance-line">
-              <strong id="confirmed-balance">0</strong>
-              <span>ENT</span>
-            </div>
-            <p class="pending-balance">Spendable <span id="spendable-balance">0</span> ENT</p>
+            <strong>Secure your wallet recovery now</strong>
+            <span>Your wallet has not been marked as backed up.</span>
           </div>
-          <div class="address-block">
-            <span>Receive address</span>
-            <div class="copy-row">
-              <code id="wallet-address">Loading...</code>
-              <button class="icon-button" id="copy-address" type="button" title="Copy address" aria-label="Copy address">
-                <i data-lucide="copy"></i>
-              </button>
-            </div>
-          </div>
-        </section>
+          <button class="secondary-button" id="backup-alert-action" type="button">
+            <i data-lucide="eye"></i><span>View recovery phrase</span>
+          </button>
+        </aside>
 
-        <section class="metrics" aria-label="Network metrics">
-          <div class="metric"><span>Height</span><strong id="height">0</strong></div>
-          <div class="metric"><span>Online peers</span><strong id="peer-count">0</strong></div>
-          <div class="metric"><span>Pending</span><strong id="pending-count">0</strong></div>
-          <div class="metric"><span>Difficulty</span><strong id="difficulty">0</strong></div>
-          <div class="metric"><span>Target</span><strong><span id="target-seconds">10</span>s</strong></div>
-        </section>
-
-        <div class="action-grid">
-          <section class="panel" aria-labelledby="send-heading">
-            <div class="panel-heading">
-              <div class="heading-icon send"><i data-lucide="arrow-up-right"></i></div>
-              <div><p class="eyebrow">Wallet</p><h2 id="send-heading">Send ENT</h2></div>
-            </div>
-            <form id="send-form">
-              <label for="send-to">Recipient</label>
-              <input id="send-to" name="to" autocomplete="off" placeholder="ent1..." required />
-              <div class="field-pair">
-                <div>
-                  <label for="send-amount">Amount</label>
-                  <div class="amount-input"><input id="send-amount" name="amount" inputmode="decimal" placeholder="0.02" required /><span>ENT</span></div>
-                </div>
-                <div>
-                  <label for="send-fee">Fee</label>
-                  <div class="amount-input"><input id="send-fee" name="fee" inputmode="decimal" value="0.001" required /><span>ENT</span></div>
-                </div>
+        <section class="view active" id="view-overview" data-view-panel="overview">
+          <section class="wallet-strip" aria-labelledby="wallet-heading">
+            <div>
+              <p class="eyebrow" id="wallet-heading">Wallet balance</p>
+              <div class="balance-line">
+                <strong id="confirmed-balance">0</strong>
+                <span>ENT</span>
               </div>
-              <button class="primary-button" type="submit"><i data-lucide="send"></i><span>Send transaction</span></button>
-            </form>
+              <p class="pending-balance">Spendable <span id="spendable-balance">0</span> ENT</p>
+            </div>
+            <div class="address-block">
+              <span>Receive address</span>
+              <div class="copy-row">
+                <code id="wallet-address">Starting...</code>
+                <button class="icon-button" id="copy-address" type="button" title="Copy address" aria-label="Copy address">
+                  <i data-lucide="copy"></i>
+                </button>
+              </div>
+            </div>
           </section>
 
-          <section class="panel" aria-labelledby="mine-heading">
-            <div class="panel-heading">
-              <div class="heading-icon mine"><i data-lucide="pickaxe"></i></div>
-              <div><p class="eyebrow">Proof of work</p><h2 id="mine-heading">Mining</h2></div>
+          <section class="sync-strip" aria-label="Chain sync status">
+            <span class="sync-icon" id="sync-icon"><i data-lucide="refresh-cw"></i></span>
+            <div class="sync-copy">
+              <div><strong id="sync-label">Checking chain</strong><span id="sync-detail">Waiting for node status</span></div>
+              <div class="sync-track"><span id="sync-progress"></span></div>
             </div>
-            <div class="mining-readout">
-              <span class="mining-indicator" id="mining-indicator"><i data-lucide="cpu"></i></span>
-              <div><strong id="mining-label">Stopped</strong><span>Reward <b id="next-reward">0.06341959</b> ENT</span></div>
-            </div>
-            <div class="button-row">
-              <button class="primary-button" id="toggle-mining" type="button"><i data-lucide="play"></i><span>Start mining</span></button>
-              <button class="secondary-button" id="mine-once" type="button"><i data-lucide="square-dot"></i><span>Mine one block</span></button>
-            </div>
-            <div class="supply-row"><span>Issued</span><strong><span id="issued">0</span> / <span id="max-supply">2,000,000</span> ENT</strong></div>
-            <div class="supply-track"><span id="supply-progress"></span></div>
           </section>
-        </div>
 
-        <div class="data-grid">
-          <section class="panel blocks-panel" aria-labelledby="blocks-heading">
+          <section class="metrics" aria-label="Network metrics">
+            <div class="metric"><span>Local height</span><strong id="height">0</strong></div>
+            <div class="metric"><span>Network height</span><strong id="best-peer-height">0</strong></div>
+            <div class="metric"><span>Online peers</span><strong id="peer-count">0</strong></div>
+            <div class="metric"><span>Pending</span><strong id="pending-count">0</strong></div>
+            <div class="metric"><span>Difficulty</span><strong id="difficulty">0</strong></div>
+            <div class="metric"><span>Block target</span><strong><span id="target-seconds">10</span>s</strong></div>
+          </section>
+
+          <div class="action-grid">
+            <section class="surface" aria-labelledby="send-heading">
+              <div class="panel-heading">
+                <div class="heading-icon send"><i data-lucide="arrow-up-right"></i></div>
+                <div><p class="eyebrow">Wallet</p><h2 id="send-heading">Send ENT</h2></div>
+              </div>
+              <form id="send-form">
+                <label for="send-to">Recipient</label>
+                <input id="send-to" name="to" autocomplete="off" placeholder="ent1..." required />
+                <div class="field-pair">
+                  <div>
+                    <label for="send-amount">Amount</label>
+                    <div class="amount-input"><input id="send-amount" name="amount" inputmode="decimal" placeholder="0.02" required /><span>ENT</span></div>
+                  </div>
+                  <div>
+                    <label for="send-fee">Fee</label>
+                    <div class="amount-input"><input id="send-fee" name="fee" inputmode="decimal" value="0.001" required /><span>ENT</span></div>
+                  </div>
+                </div>
+                <button class="primary-button full-button" type="submit"><i data-lucide="send"></i><span>Send transaction</span></button>
+              </form>
+            </section>
+
+            <section class="surface" aria-labelledby="mine-heading">
+              <div class="panel-heading">
+                <div class="heading-icon mine"><i data-lucide="pickaxe"></i></div>
+                <div><p class="eyebrow">Proof of work</p><h2 id="mine-heading">Mining</h2></div>
+              </div>
+              <div class="mining-readout">
+                <span class="mining-indicator" id="mining-indicator"><i data-lucide="cpu"></i></span>
+                <div><strong id="mining-label">Stopped</strong><span>Next reward <b id="next-reward">0</b> ENT</span></div>
+              </div>
+              <div class="button-row">
+                <button class="primary-button" id="toggle-mining" type="button"><i data-lucide="play"></i><span>Start mining</span></button>
+                <button class="secondary-button" id="mine-once" type="button"><i data-lucide="square-dot"></i><span>Mine one block</span></button>
+              </div>
+              <div class="supply-row"><span>Issued</span><strong><span id="issued">0</span> / <span id="max-supply">2,000,000</span> ENT</strong></div>
+              <div class="supply-track"><span id="supply-progress"></span></div>
+            </section>
+          </div>
+
+          <section class="surface blocks-panel" aria-labelledby="blocks-heading">
             <div class="section-heading">
               <div><p class="eyebrow">Ledger</p><h2 id="blocks-heading">Recent blocks</h2></div>
               <code id="tip-hash">--</code>
             </div>
             <div class="table-wrap">
-              <table>
+              <table class="blocks-table">
                 <thead><tr><th>Height</th><th>Hash</th><th>Time</th><th>Tx</th><th>Work</th></tr></thead>
-                <tbody id="blocks-body"></tbody>
+                <tbody id="blocks-body"><tr><td colspan="5" class="empty-cell">Waiting for ledger</td></tr></tbody>
               </table>
             </div>
           </section>
+        </section>
 
-          <section class="panel peers-panel" aria-labelledby="peers-heading">
-            <div class="section-heading">
-              <div><p class="eyebrow">Network</p><h2 id="peers-heading">Peers</h2></div>
-              <span class="count-badge" id="peer-badge">0</span>
+        <section class="view" id="view-transactions" data-view-panel="transactions" hidden>
+          <div class="view-heading">
+            <div><p class="eyebrow">Wallet ledger</p><h1>Transaction history</h1></div>
+            <button class="icon-button outlined" id="refresh-history" type="button" title="Refresh history" aria-label="Refresh history">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </div>
+          <section class="surface history-surface">
+            <div class="history-summary">
+              <span><b id="history-count">0</b> transactions</span>
+              <span id="history-updated">Not loaded</span>
             </div>
-            <form id="peer-form" class="peer-form">
-              <label for="peer-url">Node URL</label>
+            <div class="table-wrap">
+              <table class="history-table">
+                <thead><tr><th>Time</th><th>Transaction</th><th>Received</th><th>Sent</th><th>Status</th></tr></thead>
+                <tbody id="history-body"><tr><td colspan="5" class="empty-cell">Loading transactions</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-network" data-view-panel="network" hidden>
+          <div class="view-heading">
+            <div><p class="eyebrow">Peer-to-peer</p><h1>Network</h1></div>
+            <span class="count-badge" id="peer-badge">0</span>
+          </div>
+          <section class="network-metrics" aria-label="Network status">
+            <div><span>Protocol</span><strong id="network-protocol">--</strong></div>
+            <div><span>Listening</span><strong id="network-listen">--</strong></div>
+            <div><span>Sync state</span><strong id="network-sync">Checking</strong></div>
+          </section>
+          <section class="surface peers-surface" aria-labelledby="peers-heading">
+            <div class="section-heading network-heading">
+              <div><p class="eyebrow">Known nodes</p><h2 id="peers-heading">Peers</h2></div>
+              <form id="peer-form" class="peer-form">
+                <label class="sr-only" for="peer-url">Node URL</label>
+                <div class="inline-form">
+                  <input id="peer-url" autocomplete="off" placeholder="http://192.168.1.20:47821" required />
+                  <button class="icon-button solid" type="submit" title="Add peer" aria-label="Add peer"><i data-lucide="plus"></i></button>
+                </div>
+              </form>
+            </div>
+            <ul class="peer-list" id="peer-list"><li class="empty-row">Waiting for peer data</li></ul>
+          </section>
+        </section>
+
+        <section class="view" id="view-wallet" data-view-panel="wallet" hidden>
+          <div class="view-heading">
+            <div><p class="eyebrow">Local identity</p><h1>Wallet security</h1></div>
+            <span class="security-state" id="wallet-security-state"><i data-lucide="shield-check"></i><span>Checking</span></span>
+          </div>
+          <section class="wallet-identity">
+            <div>
+              <span>Active receive address</span>
+              <code id="wallet-page-address">--</code>
+            </div>
+            <button class="icon-button outlined" id="copy-wallet-page-address" type="button" title="Copy address" aria-label="Copy address"><i data-lucide="copy"></i></button>
+          </section>
+          <section class="surface wallet-actions" aria-label="Wallet actions">
+            <div class="wallet-action-row">
+              <span class="action-icon green"><i data-lucide="key-round"></i></span>
+              <div><strong>Recovery phrase</strong><span id="recovery-action-detail">24-word offline recovery</span></div>
+              <button class="secondary-button" id="open-recovery" type="button"><i data-lucide="eye"></i><span>View</span></button>
+            </div>
+            <div class="wallet-action-row">
+              <span class="action-icon blue"><i data-lucide="download"></i></span>
+              <div><strong>Encrypted backup</strong><span>Portable .entwallet file</span></div>
+              <button class="secondary-button" id="open-export" type="button"><i data-lucide="save"></i><span>Export</span></button>
+            </div>
+            <div class="wallet-action-row">
+              <span class="action-icon amber"><i data-lucide="upload"></i></span>
+              <div><strong>Restore encrypted backup</strong><span>Replace the active wallet from a backup file</span></div>
+              <button class="secondary-button" id="open-restore-backup" type="button"><i data-lucide="rotate-ccw"></i><span>Restore</span></button>
+            </div>
+            <div class="wallet-action-row">
+              <span class="action-icon amber"><i data-lucide="file-key"></i></span>
+              <div><strong>Restore recovery phrase</strong><span>Replace the active wallet from 24 words</span></div>
+              <button class="secondary-button" id="open-restore-phrase" type="button"><i data-lucide="rotate-ccw"></i><span>Restore</span></button>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-diagnostics" data-view-panel="diagnostics" hidden>
+          <div class="view-heading">
+            <div><p class="eyebrow">Local node</p><h1>Diagnostics</h1></div>
+            <span class="health-label" id="health-label"><i data-lucide="activity"></i><span>Checking</span></span>
+          </div>
+          <section class="surface diagnostic-surface">
+            <dl class="diagnostic-list">
+              <div><dt>Database</dt><dd><code id="database-path">--</code><button class="icon-button" id="copy-database-path" type="button" title="Copy database path" aria-label="Copy database path"><i data-lucide="copy"></i></button></dd></div>
+              <div><dt>Database size</dt><dd id="database-size">--</dd></div>
+              <div><dt>Storage mode</dt><dd><span class="storage-mode" id="storage-mode">Checking</span></dd></div>
+              <div><dt>Retention depth</dt><dd id="prune-depth">--</dd></div>
+              <div><dt>Pruned through</dt><dd id="pruned-through">Not pruned</dd></div>
+              <div><dt>Protocol</dt><dd><code id="diagnostic-protocol">--</code></dd></div>
+              <div><dt>Listener</dt><dd><code id="diagnostic-listen">--</code></dd></div>
+              <div><dt>Chain tip</dt><dd><code id="diagnostic-tip">--</code></dd></div>
+              <div><dt>Emission schedule</dt><dd id="emission-blocks">--</dd></div>
+              <div><dt>Last node error</dt><dd id="last-error">None</dd></div>
+            </dl>
+          </section>
+          <section class="surface prune-surface" aria-labelledby="prune-heading">
+            <div class="prune-copy">
+              <span class="action-icon amber"><i data-lucide="database"></i></span>
+              <div>
+                <p class="eyebrow">Ledger storage</p>
+                <h2 id="prune-heading">Prune historical data</h2>
+                <p>Old block bodies and undo records are deleted. Headers, the current UTXO set, and transaction/address indexes remain. Archive mode stops future pruning but does not restore deleted data.</p>
+              </div>
+            </div>
+            <form id="prune-form" class="prune-form">
+              <label for="prune-retain">Recent blocks to retain (120 - 31,536,000)</label>
               <div class="inline-form">
-                <input id="peer-url" placeholder="http://192.168.1.20:47821" required />
-                <button class="icon-button solid" type="submit" title="Add peer" aria-label="Add peer"><i data-lucide="plus"></i></button>
+                <input id="prune-retain" type="number" inputmode="numeric" min="120" max="31536000" step="1" placeholder="100000" required />
+                <div class="prune-buttons">
+                  <button class="secondary-button" type="submit"><i data-lucide="trash-2"></i><span>Review pruning</span></button>
+                  <button class="secondary-button" id="switch-archive" type="button"><i data-lucide="database"></i><span>Switch to archive</span></button>
+                </div>
               </div>
             </form>
-            <ul class="peer-list" id="peer-list"><li class="empty-row">No peers connected</li></ul>
           </section>
-        </div>
+          <p class="testnet-notice"><i data-lucide="circle-alert"></i><span>Entropy is public testnet software and has not undergone an independent security audit. Do not use it to hold real-world value.</span></p>
+        </section>
       </main>
 
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+      <div class="startup-overlay visible" id="startup-overlay" role="dialog" aria-modal="true" aria-labelledby="startup-title">
+        <section class="startup-window">
+          <div class="startup-brand"><span class="brand-mark">E</span><div><strong>Entropy Node</strong><span>Secure desktop startup</span></div></div>
+          <div id="startup-loading">
+            <span class="startup-spinner"><i data-lucide="loader-circle"></i></span>
+            <h1 id="startup-title">Starting local node</h1>
+            <p id="startup-message">Opening wallet and ledger...</p>
+          </div>
+          <form id="migration-form" class="startup-form" hidden>
+            <span class="migration-icon"><i data-lucide="lock-keyhole"></i></span>
+            <h1>Protect legacy wallet</h1>
+            <p>Your existing wallet must be encrypted before this node can start. Select a backup destination in the next step.</p>
+            <label for="migration-password">Backup password</label>
+            <input id="migration-password" type="password" autocomplete="new-password" maxlength="1024" required />
+            <label for="migration-confirm">Confirm password</label>
+            <input id="migration-confirm" type="password" autocomplete="new-password" maxlength="1024" required />
+            <div class="password-status"><span>12-1024 UTF-8 bytes</span><strong id="migration-password-bytes">0 bytes</strong></div>
+            <button class="primary-button full-button" type="submit"><i data-lucide="shield-check"></i><span>Encrypt wallet and start node</span></button>
+          </form>
+          <div id="startup-failed" class="startup-failed" hidden>
+            <span><i data-lucide="circle-alert"></i></span>
+            <h1>Node could not start</h1>
+            <p id="startup-error">Unknown startup error</p>
+            <button class="secondary-button" id="retry-startup" type="button"><i data-lucide="refresh-cw"></i><span>Check again</span></button>
+          </div>
+        </section>
+      </div>
+
+      <dialog class="modal" id="recovery-dialog" aria-labelledby="recovery-title">
+        <div class="modal-shell wide-modal">
+          <header class="modal-heading">
+            <div><span class="modal-icon green"><i data-lucide="key-round"></i></span><div><p class="eyebrow">Wallet recovery</p><h2 id="recovery-title">Recovery phrase</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="recovery-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice"><i data-lucide="triangle-alert"></i><span>Anyone with these words can spend this wallet. Keep them offline and private.</span></div>
+          <div class="recovery-placeholder" id="recovery-placeholder">
+            <i data-lucide="eye-off"></i>
+            <button class="primary-button" id="reveal-recovery" type="button"><i data-lucide="eye"></i><span>Reveal phrase</span></button>
+          </div>
+          <div id="recovery-content" hidden>
+            <ol class="recovery-grid" id="recovery-grid"></ol>
+            <div class="recovery-controls">
+              <button class="secondary-button" id="copy-recovery" type="button"><i data-lucide="copy"></i><span>Copy words</span></button>
+              <label class="check-control"><input id="recovery-confirm-check" type="checkbox" /><span>I have stored these words offline</span></label>
+              <button class="primary-button" id="confirm-recovery" type="button" disabled><i data-lucide="shield-check"></i><span>Mark as secured</span></button>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog class="modal" id="export-dialog" aria-labelledby="export-title">
+        <form class="modal-shell" id="export-form">
+          <header class="modal-heading">
+            <div><span class="modal-icon blue"><i data-lucide="download"></i></span><div><p class="eyebrow">Portable backup</p><h2 id="export-title">Export encrypted wallet</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="export-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <label for="export-password">Backup password</label>
+          <input id="export-password" type="password" autocomplete="new-password" maxlength="1024" required />
+          <label for="export-confirm">Confirm password</label>
+          <input id="export-confirm" type="password" autocomplete="new-password" maxlength="1024" required />
+          <div class="password-status"><span>12-1024 UTF-8 bytes</span><strong id="export-password-bytes">0 bytes</strong></div>
+          <button class="primary-button full-button" type="submit"><i data-lucide="save"></i><span>Choose destination</span></button>
+        </form>
+      </dialog>
+
+      <dialog class="modal" id="restore-backup-dialog" aria-labelledby="restore-backup-title">
+        <form class="modal-shell" id="restore-backup-form">
+          <header class="modal-heading">
+            <div><span class="modal-icon amber"><i data-lucide="upload"></i></span><div><p class="eyebrow">Replace wallet</p><h2 id="restore-backup-title">Restore encrypted backup</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="restore-backup-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>Stop mining first. A successful restore immediately replaces the active wallet.</span></div>
+          <label for="restore-backup-password">Backup password</label>
+          <input id="restore-backup-password" type="password" autocomplete="off" maxlength="1024" required />
+          <div class="password-status"><span>12-1024 UTF-8 bytes</span><strong id="restore-password-bytes">0 bytes</strong></div>
+          <label class="check-control destructive-check"><input id="restore-backup-check" type="checkbox" required /><span>Replace the active wallet</span></label>
+          <button class="danger-button full-button" type="submit"><i data-lucide="rotate-ccw"></i><span>Choose backup and restore</span></button>
+        </form>
+      </dialog>
+
+      <dialog class="modal" id="restore-phrase-dialog" aria-labelledby="restore-phrase-title">
+        <form class="modal-shell" id="restore-phrase-form">
+          <header class="modal-heading">
+            <div><span class="modal-icon amber"><i data-lucide="file-key"></i></span><div><p class="eyebrow">Replace wallet</p><h2 id="restore-phrase-title">Restore recovery phrase</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="restore-phrase-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>Stop mining first. Enter the complete 24-word phrase.</span></div>
+          <label for="restore-phrase">Recovery phrase</label>
+          <textarea id="restore-phrase" rows="5" autocomplete="off" autocapitalize="none" spellcheck="false" required></textarea>
+          <div class="password-status"><span>Expected phrase length</span><strong id="restore-word-count">0 / 24 words</strong></div>
+          <label class="check-control destructive-check"><input id="restore-phrase-check" type="checkbox" required /><span>Replace the active wallet</span></label>
+          <button class="danger-button full-button" type="submit"><i data-lucide="rotate-ccw"></i><span>Restore wallet</span></button>
+        </form>
+      </dialog>
+
+      <dialog class="modal" id="prune-dialog" aria-labelledby="prune-confirm-title">
+        <div class="modal-shell">
+          <header class="modal-heading">
+            <div><span class="modal-icon amber"><i data-lucide="database"></i></span><div><p class="eyebrow">Permanent storage change</p><h2 id="prune-confirm-title">Confirm ledger pruning</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="prune-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span id="prune-impact">Reviewing prune horizon...</span></div>
+          <dl class="prune-retention-list">
+            <div><dt>Deleted</dt><dd>Old block bodies, transaction bodies, and undo records</dd></div>
+            <div><dt>Retained</dt><dd>All headers, current UTXOs, and transaction/address indexes</dd></div>
+          </dl>
+          <label class="check-control destructive-check"><input id="prune-confirm-check" type="checkbox" /><span>I understand old bodies and undo data cannot be restored without resyncing</span></label>
+          <button class="danger-button full-button" id="confirm-prune" type="button" disabled><i data-lucide="trash-2"></i><span>Prune ledger</span></button>
+        </div>
+      </dialog>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

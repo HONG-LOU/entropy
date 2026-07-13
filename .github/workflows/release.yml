@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install pinned packaging tools
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+          choco install nsis --version=3.11 -y --no-progress
+
+      - name: Build and verify release artifacts
+        shell: pwsh
+        run: .\scripts\build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: entropy-windows-amd64
+          if-no-files-found: error
+          path: |
+            build/bin/Entropy.exe
+            build/bin/entropy-amd64-installer.exe
+            build/bin/SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            build/bin/Entropy.exe
+            build/bin/entropy-amd64-installer.exe
+            build/bin/SHA256SUMS.txt

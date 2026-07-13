@@ -1,22 +1,26 @@
 package core
 
 const (
-	ChainName              = "Entropy"
-	ChainSymbol            = "ENT"
-	StateVersion           = 1
-	InitialDifficulty      = 22
-	AdjustmentBlocks       = 60
-	FirstAdjustment        = 120
-	MinimumDifficulty      = 4
-	MaximumDifficulty      = 255
-	MedianTimeBlocks       = 11
-	MaxFutureSeconds       = 120
-	MaxBlockBytes          = 1 << 20
-	MaxTransactionBytes    = 64 << 10
-	MaxBlockTransactions   = 2_000
-	MaxTransactionInputs   = 256
-	MaxTransactionOutputs  = 256
-	MaxPendingTransactions = 5_000
+	ChainName                     = "Entropy"
+	ChainSymbol                   = "ENT"
+	StateVersion                  = 1
+	InitialDifficulty             = 22
+	AdjustmentBlocks              = 60
+	FirstAdjustment               = 120
+	MinimumDifficulty             = 4
+	MaximumDifficulty             = 255
+	MedianTimeBlocks              = 11
+	MaxFutureSeconds              = 120
+	MaxBlockBytes                 = 1 << 20
+	MaxTransactionBytes           = 64 << 10
+	MaxBlockTransactions          = 2_000
+	MaxTransactionInputs          = 256
+	MaxTransactionOutputs         = 256
+	MaxPendingTransactions        = 5_000
+	CoinbaseMaturity       uint64 = 100
+	// Coinbase maturity activates at height 100 so the published v0.1 chain
+	// can be replayed without reinterpreting its earlier transactions.
+	CoinbaseMaturityActivationHeight uint64 = 100
 )
 
 type TxInput struct {
