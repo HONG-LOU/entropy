@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171b1a" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <link rel="icon" href="data:," />
+    <title>Entropy</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">E</div>
+          <div>
+            <strong>Entropy</strong>
+            <span>ENT desktop node</span>
+          </div>
+        </div>
+        <div class="node-state">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="node-state-label">Connecting</span>
+          <code id="listen-address">--</code>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="wallet-strip" aria-labelledby="wallet-heading">
+          <div>
+            <p class="eyebrow" id="wallet-heading">Wallet balance</p>
+            <div class="balance-line">
+              <strong id="confirmed-balance">0</strong>
+              <span>ENT</span>
+            </div>
+            <p class="pending-balance">Spendable <span id="spendable-balance">0</span> ENT</p>
+          </div>
+          <div class="address-block">
+            <span>Receive address</span>
+            <div class="copy-row">
+              <code id="wallet-address">Loading...</code>
+              <button class="icon-button" id="copy-address" type="button" title="Copy address" aria-label="Copy address">
+                <i data-lucide="copy"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="metrics" aria-label="Network metrics">
+          <div class="metric"><span>Height</span><strong id="height">0</strong></div>
+          <div class="metric"><span>Online peers</span><strong id="peer-count">0</strong></div>
+          <div class="metric"><span>Pending</span><strong id="pending-count">0</strong></div>
+          <div class="metric"><span>Difficulty</span><strong id="difficulty">0</strong></div>
+          <div class="metric"><span>Target</span><strong><span id="target-seconds">10</span>s</strong></div>
+        </section>
+
+        <div class="action-grid">
+          <section class="panel" aria-labelledby="send-heading">
+            <div class="panel-heading">
+              <div class="heading-icon send"><i data-lucide="arrow-up-right"></i></div>
+              <div><p class="eyebrow">Wallet</p><h2 id="send-heading">Send ENT</h2></div>
+            </div>
+            <form id="send-form">
+              <label for="send-to">Recipient</label>
+              <input id="send-to" name="to" autocomplete="off" placeholder="ent1..." required />
+              <div class="field-pair">
+                <div>
+                  <label for="send-amount">Amount</label>
+                  <div class="amount-input"><input id="send-amount" name="amount" inputmode="decimal" placeholder="0.02" required /><span>ENT</span></div>
+                </div>
+                <div>
+                  <label for="send-fee">Fee</label>
+                  <div class="amount-input"><input id="send-fee" name="fee" inputmode="decimal" value="0.001" required /><span>ENT</span></div>
+                </div>
+              </div>
+              <button class="primary-button" type="submit"><i data-lucide="send"></i><span>Send transaction</span></button>
+            </form>
+          </section>
+
+          <section class="panel" aria-labelledby="mine-heading">
+            <div class="panel-heading">
+              <div class="heading-icon mine"><i data-lucide="pickaxe"></i></div>
+              <div><p class="eyebrow">Proof of work</p><h2 id="mine-heading">Mining</h2></div>
+            </div>
+            <div class="mining-readout">
+              <span class="mining-indicator" id="mining-indicator"><i data-lucide="cpu"></i></span>
+              <div><strong id="mining-label">Stopped</strong><span>Reward <b id="next-reward">0.06341959</b> ENT</span></div>
+            </div>
+            <div class="button-row">
+              <button class="primary-button" id="toggle-mining" type="button"><i data-lucide="play"></i><span>Start mining</span></button>
+              <button class="secondary-button" id="mine-once" type="button"><i data-lucide="square-dot"></i><span>Mine one block</span></button>
+            </div>
+            <div class="supply-row"><span>Issued</span><strong><span id="issued">0</span> / <span id="max-supply">2,000,000</span> ENT</strong></div>
+            <div class="supply-track"><span id="supply-progress"></span></div>
+          </section>
+        </div>
+
+        <div class="data-grid">
+          <section class="panel blocks-panel" aria-labelledby="blocks-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow">Ledger</p><h2 id="blocks-heading">Recent blocks</h2></div>
+              <code id="tip-hash">--</code>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Height</th><th>Hash</th><th>Time</th><th>Tx</th><th>Work</th></tr></thead>
+                <tbody id="blocks-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel peers-panel" aria-labelledby="peers-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow">Network</p><h2 id="peers-heading">Peers</h2></div>
+              <span class="count-badge" id="peer-badge">0</span>
+            </div>
+            <form id="peer-form" class="peer-form">
+              <label for="peer-url">Node URL</label>
+              <div class="inline-form">
+                <input id="peer-url" placeholder="http://192.168.1.20:47821" required />
+                <button class="icon-button solid" type="submit" title="Add peer" aria-label="Add peer"><i data-lucide="plus"></i></button>
+              </div>
+            </form>
+            <ul class="peer-list" id="peer-list"><li class="empty-row">No peers connected</li></ul>
+          </section>
+        </div>
+      </main>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

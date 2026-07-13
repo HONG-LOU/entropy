@@ -1,0 +1,10 @@
+/bin/
+/build/bin/
+/data/
+*.wallet.json
+*.tmp
+/frontend/node_modules/
+/frontend/wailsjs/
+/frontend/package.json.md5
+/.playwright-cli/
+/output/playwright/
