@@ -1,8 +1,10 @@
-# Public archive seed deployment on Windows
+# Public archive seed deployment
 
-This runbook deploys one Entropy archive seed behind Caddy on a Windows x64
-host. The node validates and stores the chain locally. Caddy terminates TLS on
-TCP 443 and proxies HTTP plus WebSocket traffic to `127.0.0.1:47821`.
+This runbook deploys one Entropy archive seed behind Caddy. The packaged
+automation targets Windows x64; the same CLI seed mode supports a minimal Linux
+systemd deployment. The node validates and stores the chain locally. Caddy
+terminates TLS on TCP 443 and proxies HTTP plus WebSocket traffic to
+`127.0.0.1:47821`.
 
 This package does not create a VPS, domain, DNS record, or public IP. Do not add
 an endpoint to the bootstrap manifest until it is deployed, externally
@@ -23,7 +25,7 @@ Caddy scheduled task (LOCAL SERVICE)
 entropy-cli scheduled task (dedicated Windows user)
     |
     v
-archive SQLite ledger and DPAPI wallet
+archive SQLite ledger; ephemeral non-financial identity; no wallet file
 ```
 
 The node must start with loopback-proxy trust enabled. It may trust
@@ -80,7 +82,7 @@ Copy `seed.env.example` to `seed.env` and replace every example value:
 | `ENTROPY_SEED_DOMAIN` | Public DNS hostname only, without scheme or path |
 | `ENTROPY_ACME_EMAIL` | ACME account contact |
 | `ENTROPY_INSTALL_DIR` | Installed binaries and scripts |
-| `ENTROPY_DATA_DIR` | Archive ledger and DPAPI wallet; outside install dir |
+| `ENTROPY_DATA_DIR` | Archive ledger only; outside install dir |
 | `ENTROPY_CADDY_DATA_DIR` | Caddy certificate state; outside install dir |
 | `ENTROPY_LOG_DIR` | Node, Caddy console, and access logs |
 | `ENTROPY_LISTEN_ADDRESS` | Must be `127.0.0.1:47821` |
@@ -108,6 +110,7 @@ The equivalent CLI controls are:
 --bootstrap-manifest URL    repeat for independent manifest delivery paths
 --no-bootstrap              disable manifests for isolated recovery only
 --trust-loopback-proxy      trust the Caddy client-IP header from loopback only
+--seed-mode                 archive relay with no persistent wallet
 ```
 
 Never use `--trust-loopback-proxy` when the node listens on a public interface.
@@ -175,38 +178,21 @@ network at least once per minute. Alert on TLS failure, non-200 responses,
 network identity mismatch, sustained height lag, task restart loops, low disk
 space, and certificate expiry.
 
-## Wallet and DPAPI operations
+## Seed identity and wallet boundary
 
-The current node always owns a wallet even when mining is disabled. A public
-seed should not receive funds or mine. Its wallet is protected by DPAPI for the
-Windows account used by `EntropySeedNode`.
+The seed runner always supplies `--seed-mode`. The process creates a temporary
+P-256 identity in memory, discards it on shutdown, and never creates
+`wallet.vault`, a recovery phrase, or a portable backup. Seed mode cannot send
+funds or mine. Do not send ENT to the transient address returned by its status
+endpoint.
 
-To create a portable wallet backup, stop the task and run the command as that
-same Windows user:
-
-```powershell
-Stop-ScheduledTask EntropySeedNode
-$secure = Read-Host "Backup password" -AsSecureString
-$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-try {
-  $env:ENTROPY_WALLET_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
-  entropy-cli.exe wallet-backup `
-    --data D:\EntropySeedData\node `
-    --output E:\OfflineBackup\seed.entwallet
-}
-finally {
-  Remove-Item Env:ENTROPY_WALLET_PASSWORD -ErrorAction SilentlyContinue
-  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
-}
-Start-ScheduledTask EntropySeedNode
-```
-
-Run that sequence from a shell logged on as the seed account; another
-administrator account cannot decrypt its user-scope DPAPI wallet.
+Startup refuses any persistent wallet artifact so an operator cannot
+accidentally expose a desktop wallet through the public service. It also
+refuses a previously pruned ledger because a bootstrap seed must serve history
+from genesis.
 
 Do not copy a live SQLite file without its WAL. For a consistent full data
-copy, stop the node task first. Protect the recovery phrase or `.entwallet`
-backup separately from the server.
+copy, stop the node task first. A seed database contains no spending key.
 
 ## Bootstrap manifest publication
 

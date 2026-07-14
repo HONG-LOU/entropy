@@ -17,10 +17,32 @@ const walletRecoveryMarker = "wallet.recovery-confirmed"
 const walletRecoveryMarkerVersion = "entropy-wallet-recovery-v2"
 
 var ErrLegacyWalletMigrationRequired = errors.New("legacy wallet requires encrypted migration")
+var ErrSeedModeWalletUnavailable = errors.New("wallet transactions and mining are unavailable in seed mode")
 
 type walletLoadState struct {
 	Created           bool
 	LegacyNeedsBackup bool
+}
+
+func loadSeedMaterial(storage *store.Store) (*vault.Material, walletLoadState, error) {
+	for _, name := range []string{walletVaultName, walletRecoveryMarker, "wallet.json"} {
+		_, err := os.Lstat(filepath.Join(storage.Directory(), name))
+		if err == nil {
+			return nil, walletLoadState{}, fmt.Errorf("seed mode refuses persistent wallet artifact %s", name)
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, walletLoadState{}, fmt.Errorf("inspect seed wallet artifact %s: %w", name, err)
+		}
+	}
+	wallet, err := core.NewWallet()
+	if err != nil {
+		return nil, walletLoadState{}, fmt.Errorf("create ephemeral seed identity: %w", err)
+	}
+	material, err := vault.FromLegacy(wallet)
+	if err != nil {
+		return nil, walletLoadState{}, fmt.Errorf("validate ephemeral seed identity: %w", err)
+	}
+	return material, walletLoadState{}, nil
 }
 
 func loadWalletMaterial(storage *store.Store, existingNodeData bool) (*vault.Material, walletLoadState, error) {

@@ -68,3 +68,24 @@ func TestParseNodeOptionsRejectsConflictingBootstrapFlags(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestParseNodeOptionsEnablesArchiveSeedMode(t *testing.T) {
+	options, err := parseNodeOptions([]string{"--seed-mode", "--prune-depth", "0", "--no-discovery"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !options.seedMode || !options.pruneDepthSet || options.pruneDepth != 0 || !options.disableDiscovery {
+		t.Fatalf("seed options = %#v", options)
+	}
+}
+
+func TestParseNodeOptionsRejectsUnsafeSeedCombinations(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"--seed-mode", "--mine"},
+		{"--seed-mode", "--prune-depth", "100"},
+	} {
+		if _, err := parseNodeOptions(arguments); err == nil {
+			t.Fatalf("seed arguments %v were accepted", arguments)
+		}
+	}
+}

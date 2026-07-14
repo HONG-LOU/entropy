@@ -14,6 +14,9 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 - Optional Windows archive-seed deployment package with Caddy HTTPS/WSS
   termination, service accounts, scheduled startup, firewall setup, health
   checks, and uninstall support.
+- Explicit Linux/Windows seed mode with archive-only storage, an ephemeral
+  non-financial identity, no persistent wallet, and disabled wallet/mining
+  operations.
 - Release artifacts for the desktop app, installer, headless CLI, public-seed
   deployment package, and SHA-256 checksums.
 

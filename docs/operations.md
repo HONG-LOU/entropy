@@ -196,7 +196,7 @@ so stop the desktop app or existing CLI node before opening the same directory.
 
 ```text
 entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
-                 [--mine] [--prune-depth BLOCKS] [--no-discovery]
+                 [--mine] [--seed-mode] [--prune-depth BLOCKS] [--no-discovery]
                  [--bootstrap-manifest HTTPS_URL] [--no-bootstrap]
                  [--trust-loopback-proxy]
 ```
@@ -206,6 +206,7 @@ entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
 | `--listen` | TCP P2P bind address; default `0.0.0.0:47821` |
 | `--peer` | Add one persistent HTTP(S) peer at startup |
 | `--mine` | Begin CPU mining immediately |
+| `--seed-mode` | Run a non-financial archive relay with an ephemeral in-memory identity and no wallet file |
 | `--prune-depth` | Explicitly persist `0` for archive, or retain `120..31,536,000` recent bodies |
 | `--no-discovery` | Disable LAN multicast send and receive for this run |
 | `--bootstrap-manifest` | Replace built-in manifest sources; repeat for fallback HTTPS URLs |
@@ -214,6 +215,10 @@ entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
 
 When `--prune-depth` is omitted, the node keeps the storage policy already
 recorded in its SQLite database. A fresh database defaults to archive mode.
+Seed mode always enforces prune depth `0`, rejects wallet artifacts or a
+previously pruned ledger, and disables sending, mining, wallet recovery,
+backup, and restore. It is intended for public infrastructure, not desktop
+wallets.
 
 ### `status`
 
@@ -292,6 +297,10 @@ The default Windows layout is:
 
 Peer records, mempool, UTXOs, history indexes, health events, prune policy, and
 prune horizon are inside `entropy.db`.
+
+A seed-mode directory omits `wallet.vault` and
+`wallet.recovery-confirmed`. Its P-256 relay identity exists only in process
+memory and changes on restart; it has no recoverable or spendable wallet.
 
 The database is reconstructable from archive peers. `wallet.vault`, the
 24-word phrase, or a `.entwallet` file is required to recover spending control.

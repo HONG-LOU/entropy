@@ -36,6 +36,7 @@ type nodeCLIOptions struct {
 	listenAddress         string
 	peer                  string
 	mine                  bool
+	seedMode              bool
 	pruneDepth            uint64
 	pruneDepthSet         bool
 	disableDiscovery      bool
@@ -88,6 +89,7 @@ func runNode(arguments []string) error {
 		PruneDepth:            options.pruneDepth,
 		PruneDepthSet:         options.pruneDepthSet,
 		DisableDiscovery:      options.disableDiscovery,
+		SeedMode:              options.seedMode,
 		BootstrapManifestURLs: options.bootstrapManifestURLs,
 		TrustLoopbackProxy:    options.trustLoopbackProxy,
 	})
@@ -124,6 +126,7 @@ func parseNodeOptions(arguments []string) (nodeCLIOptions, error) {
 	listen := flags.String("listen", node.DefaultListenAddress, "P2P listen address")
 	peer := flags.String("peer", "", "peer URL, for example http://192.168.1.20:47821")
 	mine := flags.Bool("mine", false, "start mining immediately")
+	seedMode := flags.Bool("seed-mode", false, "run an archive relay with an ephemeral non-financial identity")
 	pruneDepth := flags.Uint64("prune-depth", 0, "retain this many recent block bodies (0 = archive)")
 	noDiscovery := flags.Bool("no-discovery", false, "disable LAN multicast peer discovery")
 	noBootstrap := flags.Bool("no-bootstrap", false, "disable public bootstrap manifests")
@@ -142,6 +145,12 @@ func parseNodeOptions(arguments []string) (nodeCLIOptions, error) {
 	if *noBootstrap && len(bootstrapManifests.values) > 0 {
 		return nodeCLIOptions{}, fmt.Errorf("--no-bootstrap cannot be combined with --bootstrap-manifest")
 	}
+	if *seedMode && *mine {
+		return nodeCLIOptions{}, fmt.Errorf("--seed-mode cannot be combined with --mine")
+	}
+	if *seedMode && pruneDepthSet && *pruneDepth != 0 {
+		return nodeCLIOptions{}, fmt.Errorf("--seed-mode requires --prune-depth 0")
+	}
 	manifestURLs := node.DefaultBootstrapManifestURLs()
 	if *noBootstrap {
 		manifestURLs = nil
@@ -153,6 +162,7 @@ func parseNodeOptions(arguments []string) (nodeCLIOptions, error) {
 		listenAddress:         *listen,
 		peer:                  *peer,
 		mine:                  *mine,
+		seedMode:              *seedMode,
 		pruneDepth:            *pruneDepth,
 		pruneDepthSet:         pruneDepthSet,
 		disableDiscovery:      *noDiscovery,

@@ -22,6 +22,7 @@ try {
 
     $arguments = @(
         "node",
+        "--seed-mode",
         "--data", [string]$config["ENTROPY_DATA_DIR"],
         "--listen", [string]$config["ENTROPY_LISTEN_ADDRESS"],
         "--prune-depth", [string]$config["ENTROPY_PRUNE_DEPTH"],

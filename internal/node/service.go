@@ -24,6 +24,7 @@ type Config struct {
 	ListenAddress         string
 	SyncInterval          time.Duration
 	DisableDiscovery      bool
+	SeedMode              bool
 	PruneDepth            uint64
 	PruneDepthSet         bool
 	InitialPruneDepth     uint64
@@ -80,6 +81,7 @@ type Service struct {
 	disableDiscovery   bool
 	fallbackPort       bool
 	trustLoopbackProxy bool
+	seedMode           bool
 	bootstrapPeers     []string
 	bootstrapURLs      []string
 	bootstrapAttempt   time.Time
@@ -191,6 +193,14 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 	if config.MaxOutboundPeers > maxPeerConnections {
 		return nil, fmt.Errorf("maximum outbound peers must not exceed %d", maxPeerConnections)
 	}
+	if config.SeedMode {
+		if config.PruneDepthSet && config.PruneDepth != 0 {
+			return nil, fmt.Errorf("seed mode requires archive storage with prune depth 0")
+		}
+		config.PruneDepth = 0
+		config.PruneDepthSet = true
+		config.InitialPruneDepth = 0
+	}
 	bootstrapPeers, err := normalizeBootstrapPeers(config.BootstrapPeers)
 	if err != nil {
 		return nil, err
@@ -227,13 +237,27 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 	}
 
 	storage := store.New(config.DataDirectory)
-	material, walletState, err := loadWalletMaterial(storage, existingData)
+	var walletState walletLoadState
+	if config.SeedMode {
+		material, walletState, err = loadSeedMaterial(storage)
+	} else {
+		material, walletState, err = loadWalletMaterial(storage, existingData)
+	}
 	if err != nil {
 		return nil, err
 	}
 	chain, err = ledger.Open(ctx, config.DataDirectory)
 	if err != nil {
 		return nil, err
+	}
+	if config.SeedMode {
+		prunedThrough, pruneErr := chain.PrunedThrough(ctx)
+		if pruneErr != nil {
+			return nil, pruneErr
+		}
+		if prunedThrough > 0 {
+			return nil, fmt.Errorf("seed mode requires unpruned history; this ledger was pruned through block %d", prunedThrough)
+		}
 	}
 	if err := migrateLegacyState(ctx, storage, chain); err != nil {
 		return nil, err
@@ -291,10 +315,11 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 		disableDiscovery:   config.DisableDiscovery,
 		fallbackPort:       config.FallbackPort,
 		trustLoopbackProxy: config.TrustLoopbackProxy,
+		seedMode:           config.SeedMode,
 		bootstrapPeers:     bootstrapPeers,
 		bootstrapURLs:      bootstrapURLs,
 		peerExchangeNext:   make(map[string]time.Time),
-		walletNeedsBackup:  walletState.Created || !walletRecoveryConfirmed(storage, material.Wallet.Address),
+		walletNeedsBackup:  !config.SeedMode && (walletState.Created || !walletRecoveryConfirmed(storage, material.Wallet.Address)),
 		walletGeneration:   1,
 		closeDone:          make(chan struct{}),
 		pruneDepth:         pruneDepth,
@@ -668,6 +693,10 @@ func (s *Service) Send(to, amountText, feeText string) (core.Transaction, error)
 		s.mu.Unlock()
 		return core.Transaction{}, fmt.Errorf("node is closed")
 	}
+	if s.seedMode {
+		s.mu.Unlock()
+		return core.Transaction{}, ErrSeedModeWalletUnavailable
+	}
 	s.wait.Add(1)
 	chain := s.ledger
 	wallet := s.wallet
@@ -693,6 +722,10 @@ func (s *Service) MineOnce(ctx context.Context) (core.Block, error) {
 	if s.closing || s.ledger == nil {
 		s.mu.Unlock()
 		return core.Block{}, fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		s.mu.Unlock()
+		return core.Block{}, ErrSeedModeWalletUnavailable
 	}
 	chain := s.ledger
 	address := s.wallet.Address
@@ -859,6 +892,10 @@ func (s *Service) StartMining() error {
 	if s.closing {
 		s.mu.Unlock()
 		return fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		s.mu.Unlock()
+		return ErrSeedModeWalletUnavailable
 	}
 	if s.mining {
 		s.mu.Unlock()

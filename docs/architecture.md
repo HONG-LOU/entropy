@@ -315,6 +315,14 @@ desktop ledger instead starts with a 20,000-block prune depth and then respects
 its persisted storage policy; fresh CLI ledgers default to archive unless
 configured otherwise.
 
+Public infrastructure can run the CLI in explicit seed mode. Seed mode forces
+archive retention and refuses a ledger whose historical bodies were already
+pruned. It uses a fresh in-memory P-256 identity for protocol fields on every
+start, writes no wallet artifact, and rejects transaction creation, mining,
+recovery, backup, and restore operations. Validation, synchronization, peer
+exchange, transaction relay, and block relay use the same code paths as a
+wallet node.
+
 ## Wallet vault and recovery
 
 New wallets use 256 bits of entropy encoded as 24 English BIP39 words. Entropy
@@ -340,6 +348,9 @@ semantics. A corrupt or missing vault never causes silent wallet regeneration.
 
 Restoring a wallet replaces the active address and is blocked while mining.
 The ledger remains independent and can be resynchronized after wallet restore.
+The DPAPI vault applies to wallet nodes; seed mode deliberately has no
+persistent wallet or recovery secret and is therefore portable to supported
+Linux servers.
 
 ## Testnet isolation and wallet recovery
 

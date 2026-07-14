@@ -40,6 +40,9 @@ The source repository is public and MIT-licensed:
   replayed by mainnet. A known recovery phrase or verified `.entwallet` backup
   can restore the same wallet key into a fresh mainnet ledger.
 - A headless CLI using the same node, consensus, wallet, ledger, and P2P code.
+- An explicit archive-only `--seed-mode` for Linux or Windows public relays. It
+  creates no wallet file, uses a new ephemeral identity after each restart,
+  and disables sending, mining, recovery, backup, and restore operations.
 - A portable desktop executable, NSIS per-user installer, headless CLI, and an
   optional Windows archive-seed deployment package.
 
@@ -173,6 +176,11 @@ go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
 # Pruned node retaining the newest 20,000 complete block bodies
 .\build\bin\entropy-cli.exe node --data .\data\node-c --listen 0.0.0.0:47823 `
   --peer http://127.0.0.1:47821 --prune-depth 20000
+
+# Public archive relay behind a local HTTPS/WSS reverse proxy
+.\build\bin\entropy-cli.exe node --seed-mode --data .\data\seed `
+  --listen 127.0.0.1:47821 --prune-depth 0 --no-discovery `
+  --trust-loopback-proxy
 ```
 
 CLI nodes load the built-in HTTPS mainnet manifest sources by default. Repeat

@@ -40,6 +40,9 @@ func (s *Service) RecoveryPhrase() (string, error) {
 	if s.closing || s.material == nil {
 		return "", fmt.Errorf("node is closed")
 	}
+	if s.seedMode {
+		return "", ErrSeedModeWalletUnavailable
+	}
 	if s.material.Mnemonic == "" {
 		return "", fmt.Errorf("this migrated legacy wallet has no recovery phrase; export an encrypted backup")
 	}
@@ -51,6 +54,9 @@ func (s *Service) ConfirmWalletRecovery() error {
 	defer s.mu.Unlock()
 	if s.closing || s.material == nil {
 		return fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		return ErrSeedModeWalletUnavailable
 	}
 	return s.confirmWalletRecoveryLocked(s.walletGeneration, s.wallet.Address)
 }
@@ -72,6 +78,10 @@ func (s *Service) ExportWalletBackup(path, password string) error {
 	if s.closing || s.material == nil {
 		s.mu.Unlock()
 		return fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		s.mu.Unlock()
+		return ErrSeedModeWalletUnavailable
 	}
 	s.wait.Add(1)
 	material := *s.material
@@ -139,6 +149,9 @@ func (s *Service) confirmWalletRecovery(generation uint64, address string) error
 	if s.closing || s.material == nil {
 		return fmt.Errorf("node is closed")
 	}
+	if s.seedMode {
+		return ErrSeedModeWalletUnavailable
+	}
 	return s.confirmWalletRecoveryLocked(generation, address)
 }
 
@@ -154,6 +167,9 @@ func (s *Service) confirmWalletRecoveryLocked(generation uint64, address string)
 }
 
 func (s *Service) RestoreWalletBackup(path, password string) (string, error) {
+	if err := s.persistentWalletOperationAllowed(); err != nil {
+		return "", err
+	}
 	secret := []byte(password)
 	defer clear(secret)
 	material, err := vault.ImportBackup(path, secret)
@@ -174,6 +190,9 @@ func (s *Service) RestoreWalletBackup(path, password string) (string, error) {
 }
 
 func (s *Service) RestoreWalletMnemonic(phrase string) (string, error) {
+	if err := s.persistentWalletOperationAllowed(); err != nil {
+		return "", err
+	}
 	material, err := vault.RestoreMnemonic(phrase)
 	if err != nil {
 		return "", err
@@ -200,6 +219,9 @@ func (s *Service) replaceWallet(material *vault.Material, recoveryConfirmed bool
 	if s.closing || s.material == nil {
 		return fmt.Errorf("node is closed")
 	}
+	if s.seedMode {
+		return ErrSeedModeWalletUnavailable
+	}
 	if s.mining || s.miningJobs > 0 {
 		return fmt.Errorf("stop mining before restoring a wallet")
 	}
@@ -224,6 +246,18 @@ func (s *Service) replaceWallet(material *vault.Material, recoveryConfirmed bool
 	}
 	if previous != nil {
 		previous.Clear()
+	}
+	return nil
+}
+
+func (s *Service) persistentWalletOperationAllowed() error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closing || s.material == nil {
+		return fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		return ErrSeedModeWalletUnavailable
 	}
 	return nil
 }
