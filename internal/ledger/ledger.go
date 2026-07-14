@@ -28,19 +28,17 @@ type Ledger struct {
 const shutdownStateMetaKey = "clean_shutdown"
 
 func Open(ctx context.Context, directory string) (*Ledger, error) {
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return nil, fmt.Errorf("create ledger directory: %w", err)
-	}
 	path := filepath.Join(directory, DatabaseName)
-	if info, err := os.Lstat(path); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 {
-			return nil, fmt.Errorf("ledger database path must not be a symbolic link")
+	exists, err := inspectLedgerPath(directory, path)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		if err := verifyExistingNetworkIdentity(ctx, path); err != nil {
+			return nil, err
 		}
-		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("ledger database path is not a regular file")
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("inspect ledger database path: %w", err)
+	} else if err := os.MkdirAll(directory, 0o700); err != nil {
+		return nil, fmt.Errorf("create ledger directory: %w", err)
 	}
 	dsn := sqliteDSN(path)
 	database, err := sql.Open("sqlite", dsn)
@@ -73,12 +71,66 @@ func Open(ctx context.Context, directory string) (*Ledger, error) {
 	return ledger, nil
 }
 
-func sqliteDSN(path string) string {
-	urlPath := filepath.ToSlash(path)
-	if filepath.VolumeName(path) != "" && !strings.HasPrefix(urlPath, "/") {
-		urlPath = "/" + urlPath
+func inspectLedgerPath(directory, path string) (bool, error) {
+	info, err := os.Lstat(path)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return false, fmt.Errorf("ledger database path must not be a symbolic link")
+		}
+		if !info.Mode().IsRegular() {
+			return false, fmt.Errorf("ledger database path is not a regular file")
+		}
+		return true, nil
 	}
-	fileURL := &url.URL{Scheme: "file", Path: urlPath}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("inspect ledger database path: %w", err)
+	}
+
+	legacyPath := filepath.Join(directory, "chain.json")
+	if _, err := os.Lstat(legacyPath); err == nil {
+		return false, fmt.Errorf("legacy chain.json is not compatible with %s; use the isolated mainnet data directory and restore only the wallet", ProtocolName)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("inspect legacy chain state: %w", err)
+	}
+	return false, nil
+}
+
+// verifyExistingNetworkIdentity is intentionally immutable and read-only. It
+// runs before schema migration or WAL configuration so opening an old network
+// database cannot alter that database, its metadata, or companion files.
+func verifyExistingNetworkIdentity(ctx context.Context, path string) error {
+	database, err := sql.Open("sqlite", sqliteReadOnlyDSN(path))
+	if err != nil {
+		return fmt.Errorf("inspect existing ledger identity: %w", err)
+	}
+	database.SetMaxOpenConns(1)
+	database.SetMaxIdleConns(0)
+	defer database.Close()
+
+	var protocol string
+	if err := database.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = 'protocol'").Scan(&protocol); err != nil {
+		return fmt.Errorf("read existing ledger protocol without modifying it: %w", err)
+	}
+	if protocol != ProtocolName {
+		return fmt.Errorf("ledger protocol %q is incompatible with %s; keep testnet and mainnet data in separate directories", protocol, ProtocolName)
+	}
+
+	var metadataGenesis, blockGenesis string
+	if err := database.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = 'genesis_hash'").Scan(&metadataGenesis); err != nil {
+		return fmt.Errorf("read existing ledger genesis metadata without modifying it: %w", err)
+	}
+	if err := database.QueryRowContext(ctx, "SELECT hash FROM blocks WHERE height = 0").Scan(&blockGenesis); err != nil {
+		return fmt.Errorf("read existing ledger genesis block without modifying it: %w", err)
+	}
+	expected := core.GenesisBlock().Hash
+	if metadataGenesis != expected || blockGenesis != expected || metadataGenesis != blockGenesis {
+		return fmt.Errorf("stored genesis does not match %s; keep networks in separate data directories", ProtocolName)
+	}
+	return nil
+}
+
+func sqliteDSN(path string) string {
+	fileURL := sqliteFileURL(path)
 	query := fileURL.Query()
 	query.Add("_pragma", "busy_timeout(5000)")
 	query.Add("_pragma", "journal_mode(WAL)")
@@ -88,6 +140,25 @@ func sqliteDSN(path string) string {
 	query.Add("_pragma", "trusted_schema(OFF)")
 	fileURL.RawQuery = query.Encode()
 	return fileURL.String()
+}
+
+func sqliteReadOnlyDSN(path string) string {
+	fileURL := sqliteFileURL(path)
+	query := fileURL.Query()
+	query.Set("mode", "ro")
+	query.Set("immutable", "1")
+	query.Add("_pragma", "query_only(ON)")
+	query.Add("_pragma", "trusted_schema(OFF)")
+	fileURL.RawQuery = query.Encode()
+	return fileURL.String()
+}
+
+func sqliteFileURL(path string) *url.URL {
+	urlPath := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" && !strings.HasPrefix(urlPath, "/") {
+		urlPath = "/" + urlPath
+	}
+	return &url.URL{Scheme: "file", Path: urlPath}
 }
 
 func (l *Ledger) Close() error {
@@ -190,11 +261,14 @@ func (l *Ledger) ensureGenesis(ctx context.Context) error {
 		return fmt.Errorf("count ledger blocks: %w", err)
 	}
 	if count > 0 {
-		var hash string
+		var hash, metadataHash string
 		if err := l.database.QueryRowContext(ctx, "SELECT hash FROM blocks WHERE height = 0").Scan(&hash); err != nil {
 			return fmt.Errorf("read stored genesis: %w", err)
 		}
-		if hash != core.GenesisBlock().Hash {
+		if err := l.database.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = 'genesis_hash'").Scan(&metadataHash); err != nil {
+			return fmt.Errorf("read stored genesis metadata: %w", err)
+		}
+		if hash != core.GenesisBlock().Hash || metadataHash != hash {
 			return fmt.Errorf("stored genesis does not match %s", ProtocolName)
 		}
 		return l.ensureProtocolMetadata(ctx)
@@ -242,10 +316,7 @@ func (l *Ledger) ensureProtocolMetadata(ctx context.Context) error {
 	if protocol == ProtocolName {
 		return nil
 	}
-	if protocol != "entropy-testnet-v2" {
-		return fmt.Errorf("ledger protocol %q is not supported by %s", protocol, ProtocolName)
-	}
-	return l.upgradeV2Protocol(ctx)
+	return fmt.Errorf("ledger protocol %q is not supported by %s; use a separate data directory", protocol, ProtocolName)
 }
 
 func encodeWork(work *big.Int) []byte {

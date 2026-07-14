@@ -46,7 +46,7 @@ svg { stroke-width: 1.8; }
 .brand-block, .node-state, .copy-row, .balance-line, .panel-heading, .section-heading,
 .mining-readout, .button-row, .inline-form, .supply-row, .view-heading, .history-summary,
 .wallet-identity, .modal-heading, .modal-heading > div, .startup-brand, .password-status,
-.security-state, .health-label, .testnet-notice, .check-control { display: flex; align-items: center; }
+.security-state, .health-label, .network-risk-notice, .check-control { display: flex; align-items: center; }
 
 .brand-block { gap: 11px; min-width: 0; }
 .brand-mark {
@@ -279,7 +279,7 @@ td code { color: var(--green); }
 .status-badge svg { width: 11px; height: 11px; }
 
 .count-badge { min-width: 27px; height: 27px; display: grid; place-items: center; padding: 0 7px; color: var(--green); background: var(--green-soft); border-radius: 13px; font-size: 11px; font-weight: 800; }
-.network-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-bottom: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.network-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .network-metrics > div { min-width: 0; padding: 14px 18px; border-left: 1px solid var(--line); }
 .network-metrics > div:first-child { padding-left: 0; border-left: 0; }
 .network-metrics span, .network-metrics strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -349,8 +349,8 @@ td code { color: var(--green); }
 .prune-retention-list > div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--soft-line); }
 .prune-retention-list dt { color: var(--muted); font-size: 10px; font-weight: 700; }
 .prune-retention-list dd { margin: 0; color: #3f4944; font-size: 10px; line-height: 15px; }
-.testnet-notice { align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: #7b5b1a; font-size: 10px; line-height: 16px; }
-.testnet-notice svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.network-risk-notice { align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: #7b5b1a; font-size: 10px; line-height: 16px; }
+.network-risk-notice svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
 
 .toast { position: fixed; right: 22px; bottom: 20px; z-index: 100; max-width: min(420px, calc(100vw - 44px)); padding: 11px 14px; color: #fff; background: var(--green); border-radius: 5px; box-shadow: 0 8px 24px rgba(23, 27, 26, 0.18); font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: 0.18s ease; overflow-wrap: anywhere; }
 .toast.visible { opacity: 1; transform: translateY(0); }

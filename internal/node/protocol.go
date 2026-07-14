@@ -40,6 +40,11 @@ type blocksRequest struct {
 	Hashes []string `json:"hashes"`
 }
 
+type mempoolRequest struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
 type blocksResponse struct {
 	Protocol string       `json:"protocol"`
 	Blocks   []core.Block `json:"blocks"`
@@ -50,14 +55,29 @@ type transactionsResponse struct {
 	Transactions []core.Transaction `json:"transactions"`
 }
 
+type peersResponse struct {
+	Protocol string   `json:"protocol"`
+	Peers    []string `json:"peers"`
+}
+
 type gossipMessage struct {
-	Type        string            `json:"type"`
-	Protocol    string            `json:"protocol"`
-	NodeID      string            `json:"node_id,omitempty"`
-	ListenPort  int               `json:"listen_port,omitempty"`
-	Status      *protocolStatus   `json:"status,omitempty"`
-	Transaction *core.Transaction `json:"transaction,omitempty"`
-	Block       *core.Block       `json:"block,omitempty"`
+	Type                 string                `json:"type"`
+	Protocol             string                `json:"protocol"`
+	NodeID               string                `json:"node_id,omitempty"`
+	ListenPort           int                   `json:"listen_port,omitempty"`
+	Status               *protocolStatus       `json:"status,omitempty"`
+	Transaction          *core.Transaction     `json:"transaction,omitempty"`
+	Block                *core.Block           `json:"block,omitempty"`
+	RequestID            string                `json:"request_id,omitempty"`
+	Part                 int                   `json:"part,omitempty"`
+	Parts                int                   `json:"parts,omitempty"`
+	HeadersRequest       *headersRequest       `json:"headers_request,omitempty"`
+	HeadersResponse      *headersResponse      `json:"headers_response,omitempty"`
+	BlocksRequest        *blocksRequest        `json:"blocks_request,omitempty"`
+	MempoolRequest       *mempoolRequest       `json:"mempool_request,omitempty"`
+	TransactionsResponse *transactionsResponse `json:"transactions_response,omitempty"`
+	ReconcileError       string                `json:"reconcile_error,omitempty"`
+	ReconcileErrorCode   string                `json:"reconcile_error_code,omitempty"`
 }
 
 func statusFromTip(tip ledger.Tip, listenPort int) protocolStatus {

@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	maxLegacyStateBytes  = 256 << 20
-	maxLegacyWalletBytes = 64 << 10
-	maxLegacyPeersBytes  = 1 << 20
+	mainnetDataDirectoryName = "mainnet-v1"
+	maxLegacyStateBytes      = 256 << 20
+	maxLegacyWalletBytes     = 64 << 10
+	maxLegacyPeersBytes      = 1 << 20
 )
 
 type Store struct {
@@ -43,7 +44,7 @@ func (s *Store) LoadLegacyState() (*core.State, bool, error) {
 		return nil, false, nil
 	}
 	if err := state.ValidateConfirmed(); err != nil {
-		return nil, false, fmt.Errorf("validate chain state: %w", err)
+		return nil, false, fmt.Errorf("legacy chain state is incompatible with %s and will not be imported: %w", core.NetworkID, err)
 	}
 	if len(state.Pending) > core.MaxPendingTransactions {
 		return nil, false, fmt.Errorf("validate chain state: pending transaction limit exceeded")

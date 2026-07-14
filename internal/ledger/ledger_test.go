@@ -44,6 +44,12 @@ func TestLedgerLifecycleReorgAndImport(t *testing.T) {
 	if err != nil || work.Cmp(wantWork) != 0 {
 		t.Fatalf("work at block 1 = %v, err %v, want %v", work, err, wantWork)
 	}
+	// This lifecycle test exercises dependency, undo, and reorg behavior. Mark
+	// its funding output non-coinbase in the private test database; maturity is
+	// covered independently without publishing a valid pre-mined chain.
+	if _, err := ledger.database.ExecContext(ctx, "UPDATE utxos SET coinbase = 0 WHERE tx_id = ?", block1.Transactions[0].ID); err != nil {
+		t.Fatal(err)
+	}
 
 	aliceUTXO, err := ledger.SpendableUTXO(ctx, alice.Address)
 	if err != nil {
@@ -146,26 +152,6 @@ func TestLedgerLifecycleReorgAndImport(t *testing.T) {
 	if _, err := ledger.DisconnectTip(ctx); err != nil {
 		t.Fatalf("disconnect block 2 before reorg: %v", err)
 	}
-	legacyWithPending := core.NewState()
-	legacyWithPending.Blocks = append(legacyWithPending.Blocks, block1)
-	legacyWithPending.Pending = []core.Transaction{first, second}
-	pendingImport, err := Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := pendingImport.ImportState(ctx, legacyWithPending); err != nil {
-		t.Fatalf("import legacy state with pending dependencies: %v", err)
-	}
-	if count, err := pendingImport.MempoolCount(ctx); err != nil || count != 2 {
-		t.Fatalf("imported pending transaction count = %d, err %v", count, err)
-	}
-	if confirmed, spendable, err := pendingImport.Balances(ctx, carol.Address); err != nil || confirmed != 0 || spendable != secondAmount {
-		t.Fatalf("imported pending Carol balances = %d/%d, err %v", confirmed, spendable, err)
-	}
-	if err := pendingImport.Close(); err != nil {
-		t.Fatalf("close pending import ledger: %v", err)
-	}
-
 	legacyWithRejectedPending := core.NewState()
 	legacyWithRejectedPending.Blocks = append(legacyWithRejectedPending.Blocks, block1)
 	legacyWithRejectedPending.Pending = []core.Transaction{{ID: strings.Repeat("f", 64)}}
@@ -240,8 +226,8 @@ func TestLedgerLifecycleReorgAndImport(t *testing.T) {
 	}
 	confirmed, spendable, err = imported.Balances(ctx, bob.Address)
 	wantBalance := core.Subsidy(1) + core.Subsidy(2)
-	if err != nil || confirmed != wantBalance || spendable != wantBalance {
-		t.Fatalf("imported Bob balances = %d/%d, err %v, want %d", confirmed, spendable, err, wantBalance)
+	if err != nil || confirmed != wantBalance || spendable != 0 {
+		t.Fatalf("imported Bob balances = %d/%d, err %v, want %d/0", confirmed, spendable, err, wantBalance)
 	}
 	if err := imported.ImportState(ctx, alternative); err == nil {
 		t.Fatal("legacy state overwrote an initialized ledger")

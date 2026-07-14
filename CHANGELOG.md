@@ -1,7 +1,55 @@
 # Changelog
 
-All notable public-testnet changes are documented here. Entropy follows no
-mainnet compatibility promise; protocol identity is the compatibility boundary.
+All notable changes are documented here. The protocol identity is the network
+compatibility boundary; a `mainnet` identity is not a security or audit claim.
+
+## [1.0.0] - 2026-07-14
+
+### Added
+
+- Public `entropy-mainnet-v1` network with a new reward-free genesis block.
+- Built-in HTTPS bootstrap-manifest discovery through the public repository and
+  its CDN mirror. The checked-in manifest intentionally contains no peers until
+  independently operated public seeds are deployed and verified.
+- Optional Windows archive-seed deployment package with Caddy HTTPS/WSS
+  termination, service accounts, scheduled startup, firewall setup, health
+  checks, and uninstall support.
+- Release artifacts for the desktop app, installer, headless CLI, public-seed
+  deployment package, and SHA-256 checksums.
+
+### Changed
+
+- Desktop and package metadata now report version `1.0.0`.
+- Fresh Windows mainnet state is isolated under
+  `%LOCALAPPDATA%\Entropy\mainnet-v1`; published testnet directories are never
+  selected automatically.
+- A fresh desktop database starts pruned with a 20,000-block body horizon and
+  then respects the persisted operator choice. CLI nodes remain archive by
+  default, and the public-seed deployment enforces archive mode.
+- Coinbase maturity is 100 blocks beginning with the first reward block at
+  height 1. The target remains one block per 10 seconds, exactly 2,000,000 ENT
+  over 31,536,000 reward-bearing heights, approximately ten years.
+- HTTP and WebSocket endpoints retain the `/v2` transport path even though the
+  network identity is `entropy-mainnet-v1`.
+
+### Compatibility
+
+- `entropy-mainnet-v1` rejects every testnet protocol identity and uses a new
+  genesis, so old testnet chains are neither migrated nor replayed.
+- Wallet control can be restored on mainnet from a known 24-word recovery phrase
+  or verified `.entwallet` backup. Chain/database files must not be copied into
+  the mainnet directory.
+- An empty bootstrap manifest means no active public seed is being claimed.
+  Cross-internet joining requires a manually configured peer or an operator to
+  deploy and publish a reachable seed.
+
+### Security status
+
+- The source repository is public, but v1.0.0 has not received an independent
+  consensus, cryptography, wallet, P2P, persistence, or desktop audit.
+- The `mainnet` name does not imply production readiness. ENT must not carry
+  real-world value unless and until independent audits and sustained hostile
+  network testing establish an appropriate security basis.
 
 ## [0.2.0] - 2026-07-13
 

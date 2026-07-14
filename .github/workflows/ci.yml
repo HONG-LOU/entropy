@@ -43,3 +43,24 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Validate Windows seed deployment scripts
+        shell: pwsh
+        run: |
+          $parseErrors = @()
+          Get-ChildItem deploy/windows-seed -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            )
+            $parseErrors += $errors
+          }
+          if ($parseErrors.Count -gt 0) {
+            throw ($parseErrors | Out-String)
+          }
+          . ./deploy/windows-seed/seed-config.ps1
+          $config = Read-SeedEnvironment ./deploy/windows-seed/seed.env.example
+          Assert-SeedEnvironment $config

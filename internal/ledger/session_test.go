@@ -2,191 +2,96 @@ package ledger
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"entropy/internal/core"
 )
 
-func TestProtocolMetadataUpgradePreservesLedgerState(t *testing.T) {
-	ctx := context.Background()
+func TestPublishedTestnetLedgerIsRejectedWithoutMutation(t *testing.T) {
 	directory := t.TempDir()
-	ledger, err := Open(ctx, directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wallet := newTestWallet(t)
-	insertSyntheticHeaders(t, ledger, 1)
-	if _, err := ledger.database.ExecContext(ctx, `
-		INSERT INTO utxos(tx_id, output_index, amount, address, created_height, coinbase)
-		VALUES(?, 0, 12345, ?, 1, 1)
-	`, "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", wallet.Address); err != nil {
-		t.Fatal(err)
-	}
-	beforeTip, err := ledger.Tip(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	beforeConfirmed, beforeSpendable, err := ledger.Balances(ctx, wallet.Address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ledger.database.ExecContext(ctx, "UPDATE meta SET value = ? WHERE key = 'protocol'", "entropy-testnet-v2"); err != nil {
-		t.Fatal(err)
-	}
-	if err := ledger.Close(); err != nil {
-		t.Fatal(err)
-	}
+	createPublishedTestnetLedger(t, directory)
+	before := snapshotDirectory(t, directory)
 
-	upgraded, err := Open(ctx, directory)
-	if err != nil {
-		t.Fatalf("open v2 ledger for known upgrade: %v", err)
+	if opened, err := Open(context.Background(), directory); err == nil {
+		_ = opened.Close()
+		t.Fatal("published testnet ledger was opened as mainnet")
+	} else if !strings.Contains(err.Error(), "entropy-testnet-v3") {
+		t.Fatalf("testnet rejection error = %v", err)
 	}
-	defer upgraded.Close()
-	var protocol string
-	if err := upgraded.database.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = 'protocol'").Scan(&protocol); err != nil {
-		t.Fatal(err)
-	}
-	if protocol != ProtocolName {
-		t.Fatalf("upgraded protocol = %q, want %q", protocol, ProtocolName)
-	}
-	afterTip, err := upgraded.Tip(ctx)
-	if err != nil || afterTip.Height != beforeTip.Height || afterTip.Hash != beforeTip.Hash || afterTip.Work.Cmp(beforeTip.Work) != 0 {
-		t.Fatalf("tip changed across protocol upgrade: before %#v after %#v err %v", beforeTip, afterTip, err)
-	}
-	afterConfirmed, afterSpendable, err := upgraded.Balances(ctx, wallet.Address)
-	if err != nil || afterConfirmed != beforeConfirmed || afterSpendable != beforeSpendable {
-		t.Fatalf("balances changed across protocol upgrade: before %d/%d after %d/%d err %v",
-			beforeConfirmed, beforeSpendable, afterConfirmed, afterSpendable, err)
+	if after := snapshotDirectory(t, directory); !reflect.DeepEqual(after, before) {
+		t.Fatalf("rejected testnet directory changed:\nbefore %#v\nafter  %#v", before, after)
 	}
 }
 
-func TestProtocolUpgradeRevalidatesMempoolForNextHeight(t *testing.T) {
-	ctx := context.Background()
+func TestMainnetProtocolCannotHideForeignGenesis(t *testing.T) {
 	directory := t.TempDir()
-	chain, err := Open(ctx, directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner := newTestWallet(t)
-	recipient := newTestWallet(t)
-	insertSyntheticHeaders(t, chain, core.CoinbaseMaturityActivationHeight-1)
-	outpoint := core.Outpoint{TxID: strings.Repeat("d", 64), Index: 0}
-	amount := uint64(10_000)
-	if _, err := chain.database.ExecContext(ctx, `
-		INSERT INTO utxos(tx_id, output_index, amount, address, created_height, coinbase)
-		VALUES(?, 0, ?, ?, ?, 1)
-	`, outpoint.TxID, int64(amount), owner.Address, int64(core.CoinbaseMaturityActivationHeight-1)); err != nil {
-		t.Fatal(err)
-	}
-	transaction, err := core.BuildTransaction(owner, recipient.Address, amount, 0, core.UTXO{
-		outpoint: {Amount: amount, Address: owner.Address},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	insertRawMempoolTransaction(t, chain, transaction)
-	if _, err := chain.database.ExecContext(ctx, "UPDATE meta SET value = ? WHERE key = 'protocol'", "entropy-testnet-v2"); err != nil {
-		t.Fatal(err)
-	}
-	if err := chain.Close(); err != nil {
-		t.Fatal(err)
-	}
+	path := createPublishedTestnetLedger(t, directory)
+	updateStoredProtocol(t, path, ProtocolName)
+	before := snapshotDirectory(t, directory)
 
-	upgraded, err := Open(ctx, directory)
-	if err != nil {
-		t.Fatalf("open height-99 v2 ledger: %v", err)
+	if opened, err := Open(context.Background(), directory); err == nil {
+		_ = opened.Close()
+		t.Fatal("testnet genesis with forged mainnet protocol was accepted")
+	} else if !strings.Contains(err.Error(), "genesis") {
+		t.Fatalf("foreign genesis rejection error = %v", err)
 	}
-	defer upgraded.Close()
-	if count, err := upgraded.MempoolCount(ctx); err != nil || count != 0 {
-		t.Fatalf("upgrade retained next-height immature spend: count=%d err=%v", count, err)
-	}
-	if !mempoolMaturityRulesActive(core.CoinbaseMaturityActivationHeight - 1) {
-		t.Fatal("next-height maturity activation was not detected")
+	if after := snapshotDirectory(t, directory); !reflect.DeepEqual(after, before) {
+		t.Fatalf("foreign-genesis database changed:\nbefore %#v\nafter  %#v", before, after)
 	}
 }
 
-func TestUnknownProtocolMetadataIsRejected(t *testing.T) {
-	ctx := context.Background()
+func TestNonMainnetProtocolsAreRejectedWithoutUpgrade(t *testing.T) {
+	for _, protocol := range []string{"entropy-testnet-v2", "foreign-chain"} {
+		t.Run(protocol, func(t *testing.T) {
+			directory := t.TempDir()
+			chain, err := Open(context.Background(), directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := chain.Path()
+			if err := chain.Close(); err != nil {
+				t.Fatal(err)
+			}
+			updateStoredProtocol(t, path, protocol)
+			before := snapshotDirectory(t, directory)
+			if opened, err := Open(context.Background(), directory); err == nil {
+				_ = opened.Close()
+				t.Fatalf("protocol %q was upgraded in place", protocol)
+			}
+			if after := snapshotDirectory(t, directory); !reflect.DeepEqual(after, before) {
+				t.Fatalf("protocol %q rejection modified the database", protocol)
+			}
+		})
+	}
+}
+
+func TestLegacyChainJSONIsRejectedBeforeDatabaseCreation(t *testing.T) {
 	directory := t.TempDir()
-	ledger, err := Open(ctx, directory)
-	if err != nil {
+	path := filepath.Join(directory, "chain.json")
+	contents := []byte(`{"version":1,"name":"Entropy","symbol":"ENT","blocks":[],"pending":[]}`)
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ledger.database.ExecContext(ctx, "UPDATE meta SET value = 'foreign-chain' WHERE key = 'protocol'"); err != nil {
-		t.Fatal(err)
+	before := snapshotDirectory(t, directory)
+	if opened, err := Open(context.Background(), directory); err == nil {
+		_ = opened.Close()
+		t.Fatal("legacy chain.json was accepted by mainnet")
+	} else if !strings.Contains(err.Error(), "chain.json") {
+		t.Fatalf("legacy chain rejection error = %v", err)
 	}
-	if err := ledger.Close(); err != nil {
-		t.Fatal(err)
+	if _, err := os.Stat(filepath.Join(directory, DatabaseName)); !os.IsNotExist(err) {
+		t.Fatalf("mainnet database was created beside legacy chain: %v", err)
 	}
-	if _, err := Open(ctx, directory); err == nil {
-		t.Fatal("unknown ledger protocol was accepted")
-	}
-}
-
-func TestV2HighChainRequiresSafeReplayOrResync(t *testing.T) {
-	ctx := context.Background()
-	archiveDirectory := t.TempDir()
-	archive, err := Open(ctx, archiveDirectory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	insertSyntheticHeaders(t, archive, core.CoinbaseMaturityActivationHeight)
-	if _, err := archive.database.ExecContext(ctx, "UPDATE meta SET value = 'entropy-testnet-v2' WHERE key = 'protocol'"); err != nil {
-		t.Fatal(err)
-	}
-	if err := archive.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Open(ctx, archiveDirectory); err == nil || !strings.Contains(err.Error(), "resync") {
-		t.Fatalf("invalid archived v2 chain upgrade error = %v", err)
-	}
-
-	prunedDirectory := t.TempDir()
-	pruned, err := Open(ctx, prunedDirectory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	insertSyntheticHeaders(t, pruned, core.CoinbaseMaturityActivationHeight)
-	if _, err := pruned.Prune(ctx, 1); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pruned.database.ExecContext(ctx, "UPDATE meta SET value = 'entropy-testnet-v2' WHERE key = 'protocol'"); err != nil {
-		t.Fatal(err)
-	}
-	if err := pruned.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Open(ctx, prunedDirectory); err == nil || !strings.Contains(err.Error(), "resync") {
-		t.Fatalf("pruned v2 chain upgrade error = %v", err)
-	}
-}
-
-func TestV3ReplayAuditDoesNotTrustStoredUTXO(t *testing.T) {
-	ctx := context.Background()
-	ledger, err := Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ledger.Close()
-	wallet := newTestWallet(t)
-	block, expectedTip := mineLedgerCandidate(t, ledger, wallet.Address)
-	if err := ledger.CommitMinedBlock(ctx, block, expectedTip); err != nil {
-		t.Fatal(err)
-	}
-	tip, err := ledger.Tip(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := ledger.validateStoredChainForV3(ctx, tip); err != nil {
-		t.Fatalf("valid archive replay audit: %v", err)
-	}
-	if _, err := ledger.database.ExecContext(ctx, "UPDATE utxos SET amount = amount + 1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := ledger.validateStoredChainForV3(ctx, tip); err == nil {
-		t.Fatal("replay audit trusted a corrupted stored UTXO")
+	if after := snapshotDirectory(t, directory); !reflect.DeepEqual(after, before) {
+		t.Fatalf("legacy directory changed:\nbefore %#v\nafter  %#v", before, after)
 	}
 }
 
@@ -229,6 +134,111 @@ func TestDirtySessionRecoversAndCleanClosePersists(t *testing.T) {
 	}
 	defer raw.Close()
 	assertShutdownState(t, raw, 1)
+}
+
+func createPublishedTestnetLedger(t *testing.T, directory string) string {
+	t.Helper()
+	chain, err := Open(context.Background(), directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := chain.Path()
+	if err := chain.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	genesis := core.Block{
+		Version: core.StateVersion, Height: 0, Timestamp: 1783900800,
+		PreviousHash: strings.Repeat("0", 64), MerkleRoot: core.MerkleRoot(nil),
+		Difficulty: 0, Transactions: []core.Transaction{},
+	}
+	genesis.Hash = genesis.ComputeHash()
+	data, err := json.Marshal(genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := openWritableTestDatabase(t, path)
+	tx, err := raw.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+		UPDATE blocks SET hash = ?, timestamp = ?, data = ?, encoded_size = ? WHERE height = 0
+	`, genesis.Hash, genesis.Timestamp, data, len(data)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec("UPDATE meta SET value = ? WHERE key = 'protocol'", "entropy-testnet-v3"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec("UPDATE meta SET value = ? WHERE key = 'genesis_hash'", genesis.Hash); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	checkpointAndCloseTestDatabase(t, raw)
+	return path
+}
+
+func updateStoredProtocol(t *testing.T, path, protocol string) {
+	t.Helper()
+	raw := openWritableTestDatabase(t, path)
+	if _, err := raw.Exec("UPDATE meta SET value = ? WHERE key = 'protocol'", protocol); err != nil {
+		t.Fatal(err)
+	}
+	checkpointAndCloseTestDatabase(t, raw)
+}
+
+func openWritableTestDatabase(t *testing.T, path string) *sql.DB {
+	t.Helper()
+	database, err := sql.Open("sqlite", sqliteDSN(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Ping(); err != nil {
+		_ = database.Close()
+		t.Fatal(err)
+	}
+	return database
+}
+
+func checkpointAndCloseTestDatabase(t *testing.T, database *sql.DB) {
+	t.Helper()
+	var busy, logFrames, checkpointedFrames int
+	if err := database.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &checkpointedFrames); err != nil {
+		_ = database.Close()
+		t.Fatal(err)
+	}
+	if busy != 0 {
+		_ = database.Close()
+		t.Fatalf("test checkpoint remained busy: %d/%d", checkpointedFrames, logFrames)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func snapshotDirectory(t *testing.T, directory string) map[string]string {
+	t.Helper()
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			snapshot[entry.Name()] = entry.Type().String()
+			continue
+		}
+		contents, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256(contents)
+		snapshot[entry.Name()] = hex.EncodeToString(digest[:])
+	}
+	return snapshot
 }
 
 func assertShutdownState(t *testing.T, database interface {

@@ -11,7 +11,9 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 
 	"entropy/internal/core"
@@ -20,6 +22,7 @@ import (
 
 const (
 	maxHeadersPerSync             = 20_000
+	maxChainSyncChunksPerRound    = 32
 	maxMempoolSyncValidations     = 64
 	maxMempoolResponseBytes       = int64(maxMempoolSyncValidations)*maxTransactionMessageBytes + 64<<10
 	maxBlocksResponseBytes        = int64(maxBlockDownloadBatch)*maxBlockBodyBytes + 64<<10
@@ -42,6 +45,10 @@ type resyncPause struct {
 }
 
 const resyncCandidateBackoff = 30 * time.Minute
+
+const entropyClientIPHeader = "X-Entropy-Client-IP"
+
+type clientIPContextKey struct{}
 
 func (r *requestRateState) allow(now time.Time) bool {
 	return r.allowAtRate(now, httpRequestsPerIPPerSecond, httpRequestsPerIPBurst)
@@ -70,6 +77,7 @@ func (s *Service) registerProtocolHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v2/headers", s.handleHeaders)
 	mux.HandleFunc("POST /v2/blocks", s.handleBlocks)
 	mux.HandleFunc("GET /v2/mempool", s.handleMempool)
+	mux.HandleFunc("GET /v2/peers", s.handlePeers)
 	mux.HandleFunc("POST /v2/transactions", s.handleTransaction)
 	mux.HandleFunc("POST /v2/block", s.handleBlock)
 	mux.HandleFunc("GET /v2/p2p", s.handleWebSocket)
@@ -241,7 +249,15 @@ func (s *Service) acceptBlock(ctx context.Context, block core.Block, source *pee
 }
 
 func (s *Service) syncPeer(peer string) {
-	if !s.beginPeerSync(peer) {
+	s.syncPeerMode(peer, true)
+}
+
+func (s *Service) syncPeerScheduled(peer string) {
+	s.syncPeerMode(peer, false)
+}
+
+func (s *Service) syncPeerMode(peer string, force bool) {
+	if !s.beginPeerSyncMode(peer, force) {
 		return
 	}
 	defer s.endPeerSync(peer)
@@ -257,6 +273,12 @@ func (s *Service) syncPeer(peer string) {
 		return
 	}
 	s.markPeerSuccess(peer, remote.Height)
+	defer s.sendStatusToOutbound(peer)
+	s.launch(func() {
+		exchangeContext, exchangeCancel := context.WithTimeout(s.backgroundContext(), 3*time.Second)
+		defer exchangeCancel()
+		s.exchangePeerAddresses(exchangeContext, peer)
+	})
 	localTip, err := s.ledger.Tip(ctx)
 	if err != nil {
 		s.setError(err)
@@ -269,13 +291,27 @@ func (s *Service) syncPeer(peer string) {
 			}
 			return
 		}
-		if err := s.syncRemoteChain(ctx, peer, localTip); err != nil {
-			if errors.Is(err, ledger.ErrReorgBeyondPrune) {
-				s.pauseChainSyncForResync(peer, remote.TipHash, err)
+		for chunk := 0; chunk < maxChainSyncChunksPerRound && localTip.Hash != remote.TipHash; chunk++ {
+			if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < 5*time.Second {
+				break
+			}
+			before := localTip.Hash
+			if err := s.syncRemoteChain(ctx, peer, localTip); err != nil {
+				if errors.Is(err, ledger.ErrReorgBeyondPrune) {
+					s.pauseChainSyncForResync(peer, remote.TipHash, err)
+					return
+				}
+				s.markPeerFailure(peer, err)
 				return
 			}
-			s.markPeerFailure(peer, err)
-			return
+			localTip, err = s.ledger.Tip(ctx)
+			if err != nil {
+				s.setError(err)
+				return
+			}
+			if localTip.Hash == before {
+				break
+			}
 		}
 	}
 	if err := s.syncRemoteMempool(ctx, peer); err != nil {
@@ -341,7 +377,16 @@ func validateRemoteStatus(status protocolStatus) error {
 	return nil
 }
 
+type remoteChainSource interface {
+	remoteBlockSource
+	requestHeaders(context.Context, headersRequest) (headersResponse, error)
+}
+
 func (s *Service) syncRemoteChain(ctx context.Context, peer string, localTip ledger.Tip) error {
+	return s.syncRemoteChainFrom(ctx, httpRemoteSource{service: s, peer: peer}, localTip)
+}
+
+func (s *Service) syncRemoteChainFrom(ctx context.Context, source remoteChainSource, localTip ledger.Tip) error {
 	select {
 	case s.chainSyncSlot <- struct{}{}:
 		defer func() { <-s.chainSyncSlot }()
@@ -364,8 +409,8 @@ func (s *Service) syncRemoteChain(ctx context.Context, peer string, localTip led
 		diverged          bool
 	)
 	for len(headers) < maxHeadersPerSync {
-		var response headersResponse
-		if err := s.postJSON(ctx, peer+"/v2/headers", headersRequest{Locator: locator, Limit: maxHeaderBatch}, maxProtocolBytes, &response); err != nil {
+		response, err := source.requestHeaders(ctx, headersRequest{Locator: locator, Limit: maxHeaderBatch})
+		if err != nil {
 			return err
 		}
 		if response.Protocol != ledger.ProtocolName {
@@ -443,7 +488,7 @@ func (s *Service) syncRemoteChain(ctx context.Context, peer string, localTip led
 			if effectiveAncestor == localTip.Height && len(candidateHeaders) > maxDirectExtensionBlocks {
 				candidateHeaders = candidateHeaders[:maxDirectExtensionBlocks]
 			}
-			staged, err := s.stageBlocks(ctx, peer, candidateHeaders)
+			staged, err := s.stageBlocksFromSource(ctx, source, candidateHeaders)
 			if err != nil {
 				return err
 			}
@@ -546,7 +591,7 @@ func (s *Service) postJSON(ctx context.Context, endpoint string, value any, maxi
 
 func (s *Service) limitRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		host, _, err := net.SplitHostPort(request.RemoteAddr)
+		host, err := s.requestClientIP(request)
 		if err != nil {
 			writeError(writer, http.StatusBadRequest, fmt.Errorf("invalid remote address"))
 			return
@@ -597,11 +642,44 @@ func (s *Service) limitRequests(next http.Handler) http.Handler {
 		select {
 		case slots <- struct{}{}:
 			defer func() { <-slots }()
-			next.ServeHTTP(writer, request)
+			ctx := context.WithValue(request.Context(), clientIPContextKey{}, host)
+			next.ServeHTTP(writer, request.WithContext(ctx))
 		default:
 			writeError(writer, http.StatusServiceUnavailable, fmt.Errorf("node is busy"))
 		}
 	})
+}
+
+func (s *Service) requestClientIP(request *http.Request) (string, error) {
+	host, _, err := net.SplitHostPort(request.RemoteAddr)
+	if err != nil {
+		return "", err
+	}
+	remote, err := netip.ParseAddr(host)
+	if err != nil {
+		return "", err
+	}
+	remote = remote.Unmap()
+	if !s.trustLoopbackProxy || !remote.IsLoopback() {
+		return remote.String(), nil
+	}
+	values := request.Header.Values(entropyClientIPHeader)
+	if len(values) == 0 {
+		return remote.String(), nil
+	}
+	if len(values) != 1 || strings.Contains(values[0], ",") {
+		return "", fmt.Errorf("proxy client IP header must contain one address")
+	}
+	client, err := netip.ParseAddr(strings.TrimSpace(values[0]))
+	if err != nil || client.Zone() != "" {
+		return "", fmt.Errorf("proxy client IP header is invalid")
+	}
+	return client.Unmap().String(), nil
+}
+
+func clientIPFromContext(ctx context.Context) string {
+	host, _ := ctx.Value(clientIPContextKey{}).(string)
+	return host
 }
 
 func (s *Service) allowWebSocketHandshakeLocked(host string, now time.Time) bool {

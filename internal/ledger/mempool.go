@@ -287,7 +287,7 @@ func (l *Ledger) SpendableUTXO(ctx context.Context, address string) (core.UTXO, 
 func spendableUTXO(ctx context.Context, query sqlQueryer, address string, spendingHeight uint64) (core.UTXO, error) {
 	enforceMaturity := spendingHeight >= core.CoinbaseMaturityActivationHeight
 	matureThrough := uint64(0)
-	if enforceMaturity {
+	if enforceMaturity && spendingHeight >= core.CoinbaseMaturity {
 		matureThrough = spendingHeight - core.CoinbaseMaturity
 	}
 	rows, err := query.QueryContext(ctx, `

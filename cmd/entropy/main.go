@@ -2,15 +2,46 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"entropy/internal/node"
 )
+
+type stringListFlag struct {
+	values []string
+}
+
+func (f *stringListFlag) String() string {
+	return strings.Join(f.values, ",")
+}
+
+func (f *stringListFlag) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("value must not be empty")
+	}
+	f.values = append(f.values, value)
+	return nil
+}
+
+type nodeCLIOptions struct {
+	dataDirectory         string
+	listenAddress         string
+	peer                  string
+	mine                  bool
+	pruneDepth            uint64
+	pruneDepthSet         bool
+	disableDiscovery      bool
+	bootstrapManifestURLs []string
+	trustLoopbackProxy    bool
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -36,36 +67,29 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return
+		}
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
 func runNode(arguments []string) error {
-	flags := flag.NewFlagSet("node", flag.ContinueOnError)
-	data := flags.String("data", "", "data directory (default: user config directory)")
-	listen := flags.String("listen", node.DefaultListenAddress, "P2P listen address")
-	peer := flags.String("peer", "", "peer URL, for example http://192.168.1.20:47821")
-	mine := flags.Bool("mine", false, "start mining immediately")
-	pruneDepth := flags.Uint64("prune-depth", 0, "retain this many recent block bodies (0 = archive)")
-	noDiscovery := flags.Bool("no-discovery", false, "disable LAN multicast peer discovery")
-	if err := flags.Parse(arguments); err != nil {
+	options, err := parseNodeOptions(arguments)
+	if err != nil {
 		return err
 	}
-	pruneDepthSet := false
-	flags.Visit(func(item *flag.Flag) {
-		if item.Name == "prune-depth" {
-			pruneDepthSet = true
-		}
-	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	service, err := node.NewContext(ctx, node.Config{
-		DataDirectory:    *data,
-		ListenAddress:    *listen,
-		PruneDepth:       *pruneDepth,
-		PruneDepthSet:    pruneDepthSet,
-		DisableDiscovery: *noDiscovery,
+		DataDirectory:         options.dataDirectory,
+		ListenAddress:         options.listenAddress,
+		PruneDepth:            options.pruneDepth,
+		PruneDepthSet:         options.pruneDepthSet,
+		DisableDiscovery:      options.disableDiscovery,
+		BootstrapManifestURLs: options.bootstrapManifestURLs,
+		TrustLoopbackProxy:    options.trustLoopbackProxy,
 	})
 	if err != nil {
 		return err
@@ -73,12 +97,12 @@ func runNode(arguments []string) error {
 	if err := service.Start(ctx); err != nil {
 		return err
 	}
-	if *peer != "" {
-		if err := service.AddPeer(*peer); err != nil {
+	if options.peer != "" {
+		if err := service.AddPeer(options.peer); err != nil {
 			return err
 		}
 	}
-	if *mine {
+	if options.mine {
 		if err := service.StartMining(); err != nil {
 			return err
 		}
@@ -92,6 +116,49 @@ func runNode(arguments []string) error {
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return service.Close(shutdown)
+}
+
+func parseNodeOptions(arguments []string) (nodeCLIOptions, error) {
+	flags := flag.NewFlagSet("node", flag.ContinueOnError)
+	data := flags.String("data", "", "data directory (default: user config directory)")
+	listen := flags.String("listen", node.DefaultListenAddress, "P2P listen address")
+	peer := flags.String("peer", "", "peer URL, for example http://192.168.1.20:47821")
+	mine := flags.Bool("mine", false, "start mining immediately")
+	pruneDepth := flags.Uint64("prune-depth", 0, "retain this many recent block bodies (0 = archive)")
+	noDiscovery := flags.Bool("no-discovery", false, "disable LAN multicast peer discovery")
+	noBootstrap := flags.Bool("no-bootstrap", false, "disable public bootstrap manifests")
+	trustLoopbackProxy := flags.Bool("trust-loopback-proxy", false, "trust one proxy client IP header from a loopback TCP peer")
+	var bootstrapManifests stringListFlag
+	flags.Var(&bootstrapManifests, "bootstrap-manifest", "HTTPS bootstrap manifest URL; repeat to configure fallback sources")
+	if err := flags.Parse(arguments); err != nil {
+		return nodeCLIOptions{}, err
+	}
+	pruneDepthSet := false
+	flags.Visit(func(item *flag.Flag) {
+		if item.Name == "prune-depth" {
+			pruneDepthSet = true
+		}
+	})
+	if *noBootstrap && len(bootstrapManifests.values) > 0 {
+		return nodeCLIOptions{}, fmt.Errorf("--no-bootstrap cannot be combined with --bootstrap-manifest")
+	}
+	manifestURLs := node.DefaultBootstrapManifestURLs()
+	if *noBootstrap {
+		manifestURLs = nil
+	} else if len(bootstrapManifests.values) > 0 {
+		manifestURLs = append([]string(nil), bootstrapManifests.values...)
+	}
+	return nodeCLIOptions{
+		dataDirectory:         *data,
+		listenAddress:         *listen,
+		peer:                  *peer,
+		mine:                  *mine,
+		pruneDepth:            *pruneDepth,
+		pruneDepthSet:         pruneDepthSet,
+		disableDiscovery:      *noDiscovery,
+		bootstrapManifestURLs: manifestURLs,
+		trustLoopbackProxy:    *trustLoopbackProxy,
+	}, nil
 }
 
 func showStatus(arguments []string) error {

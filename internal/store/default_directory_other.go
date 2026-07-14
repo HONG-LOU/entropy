@@ -15,5 +15,5 @@ func DefaultDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("find user config directory: %w", err)
 	}
-	return filepath.Join(base, core.ChainName), nil
+	return filepath.Join(base, core.ChainName, mainnetDataDirectoryName), nil
 }

@@ -1,22 +1,27 @@
-# Entropy public-testnet roadmap
+# Entropy mainnet roadmap
 
-v0.2 provides the complete local product loop: protected wallet, SQLite UTXO
-ledger, undo-based cumulative-work reorg, incremental header/body sync,
-WebSocket relay, LAN discovery, mining, transaction history, legacy migration,
-pruning, desktop packaging, and a headless node.
+v1.0.0 establishes the public `entropy-mainnet-v1` compatibility boundary: a
+new genesis, an isolated data directory, full desktop validation and relay,
+wallet recovery, proof-of-work mining, SQLite persistence, incremental sync,
+pruning, HTTPS bootstrap manifests, and an optional Windows archive-seed
+deployment package.
 
-The remaining work is about public infrastructure, adversarial assurance, and
-release trust. None of the items below is permission to assign real-world value
-to ENT.
+The `mainnet` name is not an audit or production-readiness claim. The public
+repository and complete local product loop make review possible; they do not
+make ENT safe for real-world value. ENT must remain valueless until appropriate
+independent audits and sustained hostile-network evidence exist.
 
-## Public bootstrap infrastructure
+## Public bootstrap operations
 
-- Deploy multiple always-on archive seed nodes on independent networks and
-  publish their ownership, retention, monitoring, and replacement policy.
-- Add a resilient bootstrap mechanism, such as signed seed lists or DNS seeds,
-  without making one operator a consensus authority.
+- Deploy multiple always-on archive seeds on independent networks and publish
+  only endpoints that pass genesis-to-tip and external HTTPS/WSS health checks.
+- Keep the public HTTPS manifest accurate, remove unhealthy endpoints quickly,
+  and publish ownership, retention, monitoring, and replacement policy.
 - Exercise full genesis-to-tip bootstrap and archive serving under realistic
-  public traffic and database growth.
+  public traffic and projected database growth. Until this is done, the empty
+  manifest correctly means that no active public seed is being claimed.
+- Add manifest signing or DNS-based fallback without making any seed operator a
+  consensus authority.
 
 ## NAT traversal and reachability
 
@@ -33,9 +38,9 @@ to ENT.
   desktop-boundary audits; publish findings and fixes.
 - Expand fuzzing, race, malformed database, resource exhaustion, eclipse,
   partition, timestamp, difficulty, and deep-reorg test campaigns.
-- Run a long-lived adversarial testnet with independent miners and operators;
-  measure propagation, stale-block rate, DAA behavior, and recovery from loss of
-  major peers.
+- Run long-lived adversarial network exercises with independent miners and
+  operators; measure propagation, stale-block rate, DAA behavior, and recovery
+  from loss of major peers.
 - Define and test a versioned consensus/protocol upgrade and rollback process.
 
 ## Release supply chain
@@ -49,7 +54,7 @@ to ENT.
 
 ## Operational maturity
 
-- Establish public testnet status and incident channels, seed health
+- Establish public network status and incident channels, seed health
   monitoring, explicit release support windows, and measured database sizing
   guidance.
 - Add privacy-conscious node diagnostics and exportable health reports without
@@ -57,7 +62,7 @@ to ENT.
 - Validate multi-year schema migration and pruning behavior against projected
   31,536,000-block growth.
 
-There is no scheduled mainnet milestone. A separate decision would require all
-critical audit findings resolved, long-running independent testnet evidence,
-stable governance and upgrades, and a new explicit risk review. Until then,
-Entropy remains a public testnet and ENT must remain valueless.
+The network identity is already `entropy-mainnet-v1`, but the security milestone
+for real-value use has not been met. That requires all critical audit findings
+resolved, long-running independent-network evidence, stable governance and
+upgrade procedures, trustworthy releases, and a new explicit risk review.

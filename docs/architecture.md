@@ -1,14 +1,16 @@
-# Entropy v0.2 architecture
+# Entropy v1.0.0 architecture
 
 ## Scope
 
-Entropy v0.2 is a public-testnet implementation, not an audited mainnet. It is
-designed so one Windows application can be a wallet, a full validator, a peer,
-and an optional proof-of-work miner without an external database service.
+Entropy v1.0.0 implements the `entropy-mainnet-v1` network. It is designed so
+one Windows application can be a wallet, a full validator, a relaying peer, and
+an optional proof-of-work miner without an external database service.
 
 The phrase "full node" means that the node independently verifies consensus
 rules before changing its active ledger. It does not mean the implementation
-has been independently audited or is safe for real-value assets.
+has been independently audited or is safe for real-value assets. Here,
+`mainnet` is only a genesis and consensus compatibility identifier. ENT must
+not carry real-world value without appropriate independent audits.
 
 ## Process layout
 
@@ -29,7 +31,7 @@ Wails desktop UI                     cmd/entropy CLI
         cryptography    UTXO and undo    backup/recovery
                             |
                      internal/store
-                 lock and legacy migration
+              lock and wallet migration
 ```
 
 The browser UI never receives the private key. Wails calls enter Go, and the Go
@@ -38,8 +40,25 @@ not wallet-control methods.
 
 ## Consensus identity and objects
 
-The network identity is `entropy-testnet-v3`. Nodes reject a peer status,
+The network identity is `entropy-mainnet-v1`. Nodes reject a peer status,
 discovery message, or WebSocket message with another protocol identity.
+
+The fixed mainnet anchor is:
+
+```text
+Genesis height       0
+Genesis timestamp    1783983600 (2026-07-13 23:00:00 UTC)
+Genesis reward       0 ENT
+Genesis hash         f58101a2332dbffff670b4b2f8d08deea08883e0719df9b008b7eb1c8d5b2f0e
+```
+
+Consensus hashes are also domain-separated, rather than relying only on the
+genesis check. The deterministic transaction encoder begins with
+`entropy-mainnet-v1`; therefore each input signing digest, regular transaction
+ID, and coinbase transaction ID binds the network. The block-header hash begins
+with the same identity, while its Merkle root commits to already separated
+transaction IDs. A testnet signature, transaction ID, coinbase ID, or block hash
+cannot be replayed as an otherwise identical mainnet object.
 
 A regular transaction contains a random nonce, inputs, and outputs. Each input
 references a previous output and carries a SEC1 P-256 public key and an ASN.1
@@ -63,8 +82,9 @@ hash to have at least `difficulty` leading zero bits. A block contributes
 The timestamp must be greater than median-time-past over the previous 11 blocks
 and no more than 120 seconds ahead of local time. Difficulty begins at 22
 leading zero bits, first adjusts at height 120, and then adjusts every 60
-blocks. This compact DAA is part of the testnet protocol and has not had the
-long-duration or adversarial review expected of a production monetary network.
+blocks. This compact DAA is part of the mainnet consensus rules and has not had
+the long-duration or adversarial review expected of a production monetary
+network.
 
 Deterministic resource limits include a 1 MiB block, 64 KiB transaction, 2,000
 transactions per block, 256 inputs and outputs per transaction, and 5,000
@@ -94,9 +114,8 @@ The fixed genesis block has no reward and there is no premine. Fees are
 existing value transferred into coinbase and cannot increase total issuance.
 The terminal reward height sums exactly to 2,000,000 ENT.
 
-Coinbase maturity is 100 blocks and activates at spending height 100. Before
-that activation height, the v0.1 testnet rules remain replayable. At and after
-height 100, spending a coinbase requires:
+Coinbase maturity is 100 blocks beginning with the first reward block at height
+1. At every reward-bearing height, spending a coinbase requires:
 
 ```text
 spending_height - coinbase_height >= 100
@@ -127,8 +146,8 @@ same commit path; neither can bypass validation.
 
 ## SQLite ledger
 
-The ledger is `%LOCALAPPDATA%\Entropy\entropy.db` for a clean install and uses
-the pure-Go `modernc.org/sqlite` driver. Connections set:
+The ledger is `%LOCALAPPDATA%\Entropy\mainnet-v1\entropy.db` for a clean Windows
+install and uses the pure-Go `modernc.org/sqlite` driver. Connections set:
 
 ```text
 journal_mode = WAL
@@ -203,12 +222,14 @@ mining, and a miner is not a network coordinator.
 
 ## Incremental peer synchronization
 
-Protocol v3 separates catch-up from real-time relay:
+The mainnet protocol separates catch-up from real-time relay:
 
 - HTTP provides status, block locators, header batches, requested body batches,
   bounded mempool catch-up, and a fallback transaction/block submission path.
 - WebSocket `/v2/p2p` carries hello/status, transaction, block, ping, and pong
-  messages without waiting for the next sync poll.
+  messages without waiting for the next sync poll. Peers that negotiate the
+  reconcile capability also tunnel bounded header, body, and mempool requests
+  through this already-established connection.
 - LAN multicast announces the node ID and TCP listen port on
   `239.255.78.21:47822/UDP`.
 
@@ -217,6 +238,31 @@ candidate work, and downloads bodies only for a chain that can beat local work.
 Bodies must match the requested headers and are fully validated during the
 atomic reorg. The removed v0.1 `/v1/state` endpoint cannot replace local state.
 
+The reverse reconcile path fixes the asymmetric NAT case. After an outbound-only
+node reconnects, the inbound peer uses that same WebSocket to request the
+outbound node's headers, selected block bodies, and paged mempool. It therefore
+converges on offline transactions and a stronger remote branch without dialing
+the advertised listen port. This is not NAT traversal: an initially isolated
+node still needs the address of at least one reachable peer.
+An incomplete but progressing round schedules a bounded follow-up. Successful
+outbound sync polls also send a current status over the live socket, so large
+paged backlogs continue until convergence.
+
+A scheduled peer-sync session has a 30-second context. A direct-extension chunk
+commits at most eight blocks, and one session attempts at most 32 chunks, so it
+can advance at most 256 directly extending blocks before the next scheduled
+session. It stops starting new chunks when less than five seconds remain; these
+bounds preserve responsiveness while still making continuous catch-up progress.
+One WebSocket reconcile round has the same 30-second bound, at most two pending
+correlated requests, at most 64 mempool transactions, and no more than one
+active round per socket. The internal downloader groups up to eight bodies, then
+splits them into socket requests of at most two hashes and returns one complete
+block per bounded frame. The receive burst covers the full internal body group,
+while queued encoded output is capped at about two maximum frames per socket.
+Invalid reconcile responses close the connection; transient busy, unavailable,
+and pruned responses back off. The existing 20,000-header and 512 MiB staged
+fork ceilings still apply.
+
 Peer failures persist in SQLite. Retry starts at one second, doubles after each
 failure, and caps at five minutes. Success resets the failure count. Global and
 per-IP request/WebSocket limits, cross-reconnect invalid-message scoring,
@@ -224,7 +270,25 @@ strict JSON decoding, bounded response/staging bytes, timeouts, and a 64-peer
 cap bound common resource-exhaustion paths. These controls reduce risk but are
 not a substitute for hostile-network auditing.
 
-See [Protocol v3](protocol.md) for endpoint and message details.
+Public peer exchange is deliberately narrower than manual or manifest
+configuration. `GET /v2/peers` returns at most 16 recently successful, online,
+active outbound peers. Untrusted exchanged candidates must be globally routable
+IP literals with explicit ports; DNS names, private/link-local/multicast and
+reserved/special-use addresses are rejected. The node retains at most 24 such
+public discovered candidates, 48 discovered peers in total, and activates eight
+outbound peers by default. An HTTPS bootstrap manifest is operator-controlled
+and may name a validated public FQDN. A peer returning `404` or `405` for the
+optional exchange endpoint remains compatible and is not failed for that reason.
+
+At startup, desktop and default CLI configurations fetch the versioned mainnet
+bootstrap manifest over HTTPS from the public repository and a CDN mirror. A
+manifest is only a bounded peer-location hint: every peer and every received
+object is still validated locally, and a manifest cannot change consensus. The
+v1.0.0 manifest has an empty peer list and therefore makes no claim that an
+active public seed exists. Startup continues with LAN/manual peers when every
+manifest source is empty or unavailable.
+
+See [Mainnet protocol](protocol.md) for endpoint and message details.
 
 ## Archive and pruned nodes
 
@@ -246,7 +310,10 @@ A pruned node continues to validate and relay all new data, but it returns HTTP
 `410 Gone` for deleted bodies and rejects a reorg crossing its prune horizon.
 It must resynchronize from an archive peer to recover from such a deep fork or
 to regain historical bodies. Public bootstrap nodes should therefore be
-archives.
+archives. The public-seed deployment package enforces archive mode. A fresh
+desktop ledger instead starts with a 20,000-block prune depth and then respects
+its persisted storage policy; fresh CLI ledgers default to archive unless
+configured otherwise.
 
 ## Wallet vault and recovery
 
@@ -274,21 +341,21 @@ semantics. A corrupt or missing vault never causes silent wallet regeneration.
 Restoring a wallet replaces the active address and is blocked while mining.
 The ledger remains independent and can be resynchronized after wallet restore.
 
-## Legacy migration
+## Testnet isolation and wallet recovery
 
-Migration is intentionally fail-closed:
+Mainnet uses both a new reward-free genesis and the isolated
+`%LOCALAPPDATA%\Entropy\mainnet-v1` directory. The ledger rejects a published
+testnet protocol or genesis before migration or schema work. Testnet
+`chain.json`, SQLite databases, mempools, peers, balances, and histories are
+never imported or replayed into mainnet.
 
-- A valid v0.1 `chain.json` imports into an empty SQLite ledger. The imported
-  tip must exactly match the legacy tip before the file is renamed
-  `chain.json.migrated.bak`.
-- `peers.json` imports into SQLite before becoming `peers.json.migrated.bak`.
-- If SQLite and legacy chain tips disagree, neither copy is replaced.
-- A plaintext `wallet.json` prevents normal startup. Migration must create and
-  reopen both a DPAPI `wallet.vault` and a password-encrypted `.entwallet`
-  backup with the same address. Only then is plaintext removed.
-
-Legacy P-256 wallet keys are preserved exactly. They have no BIP39 phrase, so
-their encrypted portable backup is the only application-level recovery copy.
+Wallet material is recoverable independently of chain state. A user may restore
+a known 24-word Entropy phrase or verified `.entwallet` backup in the mainnet
+desktop application. This recovers the P-256 key and address, while mainnet
+balances and history come only from mainnet blocks. A v0.1 plaintext wallet can
+first be converted with `wallet-migrate` against a copy of its old directory;
+its resulting encrypted portable backup is the only application-level recovery
+copy because legacy keys have no BIP39 phrase.
 
 ## Security boundary
 
@@ -297,8 +364,12 @@ coinbase maturity, timestamps, size limits, UTXO ownership, and cumulative-work
 fork choice. Private keys stay outside P2P and frontend bindings.
 
 It does not yet provide independent audit evidence, authenticated peers,
-built-in transport encryption, public seed infrastructure, NAT traversal,
-signed binaries, reproducible builds, or a mature protocol-upgrade process.
-P-256 and the compact fast-chain DAA are testnet design choices, not claims of
-Bitcoin compatibility. Read [SECURITY.md](../SECURITY.md) before exposing a
-node or handling wallet material.
+built-in node-side transport encryption, automatic NAT traversal, signed
+binaries, reproducible builds, or a mature protocol-upgrade process. HTTPS
+manifest delivery and the optional reverse-proxied seed package help discovery
+and transport deployment; they are not audit evidence or consensus authorities,
+and the checked-in manifest does not claim an active seed. P-256 and the compact
+fast-chain DAA are project-specific design choices, not claims of Bitcoin
+compatibility. ENT must not carry real-world value without appropriate
+independent audits. Read [SECURITY.md](../SECURITY.md) before exposing a node or
+handling wallet material.

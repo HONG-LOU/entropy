@@ -74,7 +74,11 @@ func (a *App) startNode(ctx context.Context) {
 	if alreadyRunning || closing {
 		return
 	}
-	service, err := node.NewContext(ctx, node.Config{FallbackPort: true})
+	service, err := node.NewContext(ctx, node.Config{
+		FallbackPort:          true,
+		InitialPruneDepth:     20_000,
+		BootstrapManifestURLs: node.DefaultBootstrapManifestURLs(),
+	})
 	if err == nil {
 		err = service.Start(ctx)
 	}

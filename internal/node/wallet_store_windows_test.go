@@ -289,7 +289,7 @@ func TestExportWalletBackupRejectsProtectedNodePaths(t *testing.T) {
 	}
 }
 
-func TestLegacyJSONNodeMigratesToSQLiteWithoutChangingTip(t *testing.T) {
+func TestLegacyJSONChainIsRejectedWhileWalletRemainsRecoverable(t *testing.T) {
 	directory := t.TempDir()
 	storage := store.New(directory)
 	wallet, err := core.NewWallet()
@@ -306,6 +306,11 @@ func TestLegacyJSONNodeMigratesToSQLiteWithoutChangingTip(t *testing.T) {
 	if err := storage.SaveLegacyState(state); err != nil {
 		t.Fatal(err)
 	}
+	chainPath := filepath.Join(directory, "chain.json")
+	chainBefore, err := os.ReadFile(chainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	peer := "http://127.0.0.1:49001"
 	if err := storage.SaveLegacyPeers([]string{peer}); err != nil {
 		t.Fatal(err)
@@ -315,24 +320,35 @@ func TestLegacyJSONNodeMigratesToSQLiteWithoutChangingTip(t *testing.T) {
 		t.Fatal(err)
 	}
 	service, err := New(testConfig(directory))
-	if err != nil {
-		t.Fatal(err)
+	if service != nil {
+		closeTestNode(t, service)
+		t.Fatal("legacy chain unexpectedly started as mainnet")
 	}
-	defer closeTestNode(t, service)
-	dashboard, err := service.Dashboard()
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || !strings.Contains(err.Error(), "chain.json") || !strings.Contains(err.Error(), ledger.ProtocolName) {
+		t.Fatalf("legacy chain rejection error = %v", err)
 	}
-	wantTip := state.Blocks[len(state.Blocks)-1]
-	if service.Address() != wallet.Address || dashboard.Height != wantTip.Height || dashboard.TipHash != wantTip.Hash {
-		t.Fatalf("migrated node = address %s height %d tip %s", service.Address(), dashboard.Height, dashboard.TipHash)
+	if _, err := os.Stat(filepath.Join(directory, ledger.DatabaseName)); !os.IsNotExist(err) {
+		t.Fatalf("mainnet database was created beside legacy chain: %v", err)
 	}
-	if dashboard.ConfiguredPeerCount != 1 || dashboard.Peers[0].URL != peer {
-		t.Fatalf("migrated peers = %+v", dashboard.Peers)
+	chainAfter, err := os.ReadFile(chainPath)
+	if err != nil || !bytes.Equal(chainAfter, chainBefore) {
+		t.Fatalf("rejected legacy chain changed: %v", err)
 	}
-	for _, name := range []string{"chain.json.migrated.bak", "peers.json.migrated.bak", ledger.DatabaseName} {
-		if _, err := os.Stat(filepath.Join(directory, name)); err != nil {
-			t.Fatalf("missing migrated artifact %s: %v", name, err)
+	for _, name := range []string{"chain.json.migrated.bak", "peers.json.migrated.bak"} {
+		if _, err := os.Stat(filepath.Join(directory, name)); !os.IsNotExist(err) {
+			t.Fatalf("legacy chain artifact %s was created: %v", name, err)
 		}
+	}
+	recovered, err := vault.OpenLocal(filepath.Join(directory, walletVaultName))
+	if err != nil {
+		t.Fatalf("open independently migrated wallet: %v", err)
+	}
+	defer recovered.Clear()
+	if recovered.Wallet.Address != wallet.Address {
+		t.Fatalf("recovered wallet address = %s, want %s", recovered.Wallet.Address, wallet.Address)
+	}
+	peers, found, err := storage.LoadLegacyPeers()
+	if err != nil || !found || len(peers) != 1 || peers[0] != peer {
+		t.Fatalf("legacy peers were altered: peers %v found %v err %v", peers, found, err)
 	}
 }

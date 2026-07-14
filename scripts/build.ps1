@@ -31,12 +31,32 @@ try {
     $bin = Join-Path $project "build\bin"
     $portable = Join-Path $bin "Entropy.exe"
     $installer = Join-Path $bin "entropy-amd64-installer.exe"
-    foreach ($expected in @($portable, $installer)) {
+    $cli = Join-Path $bin "entropy-cli.exe"
+    go build -trimpath -o $cli .\cmd\entropy
+    if ($LASTEXITCODE -ne 0) { throw "CLI build failed with exit code $LASTEXITCODE" }
+
+    $seedStage = Join-Path $project "build\seed-package"
+    $seedPackage = Join-Path $bin "entropy-windows-seed-deploy.zip"
+    if (Test-Path -LiteralPath $seedStage) {
+        Remove-Item -LiteralPath $seedStage -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $seedStage | Out-Null
+    try {
+        Copy-Item -Path (Join-Path $project "deploy\windows-seed\*") -Destination $seedStage -Recurse
+        Copy-Item -LiteralPath $cli -Destination (Join-Path $seedStage "entropy-cli.exe")
+        Copy-Item -LiteralPath (Join-Path $project "docs\public-seed.md") -Destination (Join-Path $seedStage "PUBLIC-SEED.md")
+        Compress-Archive -Path (Join-Path $seedStage "*") -DestinationPath $seedPackage -CompressionLevel Optimal -Force
+    }
+    finally {
+        Remove-Item -LiteralPath $seedStage -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    foreach ($expected in @($portable, $installer, $cli, $seedPackage)) {
         if (-not (Test-Path -LiteralPath $expected -PathType Leaf)) {
             throw "Expected release artifact was not produced: $expected"
         }
     }
-    $artifacts = Get-Item -LiteralPath $portable, $installer | Sort-Object Name
+    $artifacts = Get-Item -LiteralPath $portable, $installer, $cli, $seedPackage | Sort-Object Name
     $checksums = foreach ($artifact in $artifacts) {
         $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName).Hash.ToLowerInvariant()
         "$hash  $($artifact.Name)"

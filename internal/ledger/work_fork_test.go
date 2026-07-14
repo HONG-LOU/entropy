@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"entropy/internal/core"
 )
@@ -84,9 +85,10 @@ func insertLowDifficultyCheckpoint(t *testing.T, chain *Ledger, through uint64) 
 	ctx := context.Background()
 	previous := core.GenesisBlock()
 	unitWork := blockWork(core.MinimumDifficulty)
+	baseTimestamp := time.Now().Unix() - 6_000
 	for height := uint64(1); height <= through; height++ {
 		hash := fmt.Sprintf("%064x", 1_000_000+height)
-		timestamp := core.GenesisBlock().Timestamp + int64(height)*core.TargetBlockSeconds
+		timestamp := baseTimestamp + int64(height)*core.TargetBlockSeconds
 		work := new(big.Int).Mul(new(big.Int).SetUint64(height), unitWork)
 		if _, err := chain.database.ExecContext(ctx, `
 			INSERT INTO blocks(

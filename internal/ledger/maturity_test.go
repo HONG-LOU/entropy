@@ -34,29 +34,19 @@ func TestCoinbaseMaturityAcrossMempoolMiningAndHeightRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	insertSyntheticHeaders(t, ledger, 98)
-	confirmed, spendable, err := ledger.Balances(ctx, owner.Address)
-	if err != nil || confirmed != sourceAmount || spendable != sourceAmount {
-		t.Fatalf("pre-activation balances = %d/%d, err %v", confirmed, spendable, err)
-	}
-	if err := ledger.AddTransaction(ctx, transaction); err != nil {
-		t.Fatalf("pre-activation mempool rejected legacy spend: %v", err)
-	}
-
 	insertSyntheticHeaders(t, ledger, 99)
-	rebuildMempoolForTest(t, ledger)
-	if count, err := ledger.MempoolCount(ctx); err != nil || count != 0 {
-		t.Fatalf("activation did not evict immature spend: %d, err %v", count, err)
-	}
-	confirmed, spendable, err = ledger.Balances(ctx, owner.Address)
+	confirmed, spendable, err := ledger.Balances(ctx, owner.Address)
 	if err != nil || confirmed != sourceAmount || spendable != 0 {
-		t.Fatalf("activation balances = %d/%d, err %v", confirmed, spendable, err)
+		t.Fatalf("immature balances = %d/%d, err %v", confirmed, spendable, err)
+	}
+	if err := ledger.AddTransaction(ctx, transaction); err == nil {
+		t.Fatal("mempool accepted an immature mainnet coinbase spend")
 	}
 	if err := validateInputMaturity([]UTXORecord{{
 		TxID: outpoint.TxID, OutputIndex: 0, Amount: sourceAmount,
 		Address: owner.Address, CreatedHeight: 1, Coinbase: true,
 	}}, 100); err == nil {
-		t.Fatal("block validation accepted immature coinbase input at height 100")
+		t.Fatal("block validation accepted a 99-block-old coinbase")
 	}
 	insertRawMempoolTransaction(t, ledger, transaction)
 	candidate, _, err := ledger.BuildMiningCandidate(ctx, owner.Address)
@@ -76,6 +66,10 @@ func TestCoinbaseMaturityAcrossMempoolMiningAndHeightRollback(t *testing.T) {
 	}
 	if err := ledger.AddTransaction(ctx, transaction); err != nil {
 		t.Fatalf("mempool rejected exactly mature coinbase: %v", err)
+	}
+	confirmed, spendable, err = ledger.Balances(ctx, owner.Address)
+	if err != nil || confirmed != sourceAmount || spendable != sourceAmount-50_000-1_000 {
+		t.Fatalf("mature balances = %d/%d, err %v", confirmed, spendable, err)
 	}
 	if _, err := ledger.database.ExecContext(ctx, "DELETE FROM blocks WHERE height = 100"); err != nil {
 		t.Fatal(err)

@@ -272,9 +272,10 @@ function renderBlocks(blocks) {
 }
 
 function peerMeta(peer) {
-  const parts = [peer.online ? "Online" : "Offline"];
+  const parts = [peer.online && peer.active_outbound ? "Online" : peer.active_outbound ? "Connecting" : "Standby"];
   if (asNumber(peer.height) > 0) parts.push(`height #${asNumber(peer.height).toLocaleString()}`);
-  parts.push(peer.discovered ? "LAN discovered" : "Manual");
+  parts.push(peer.bootstrap ? "Bootstrap" : peer.discovered ? peer.public ? "Public discovery" : "Local discovery" : "Manual");
+  if (peer.active_outbound) parts.push("Outbound");
   if (asNumber(peer.failures) > 0) parts.push(`${asNumber(peer.failures)} failures`);
   return parts.join(" | ");
 }
@@ -295,7 +296,7 @@ function renderPeers(peers) {
     if (peer.last_error) row.title = String(peer.last_error);
 
     const dot = document.createElement("span");
-    dot.className = `peer-dot${peer.online ? "" : " offline"}`;
+    dot.className = `peer-dot${peer.online && peer.active_outbound ? "" : " offline"}`;
 
     const main = document.createElement("div");
     main.className = "peer-main";
@@ -313,7 +314,8 @@ function renderPeers(peers) {
     remove.append(icon("trash-2"));
     remove.addEventListener("click", () => removePeer(String(peer.url || ""), remove));
 
-    row.append(dot, main, remove);
+    row.append(dot, main);
+    if (!peer.bootstrap) row.append(remove);
     list.append(row);
   }
 }
@@ -339,7 +341,14 @@ function renderSync(data) {
   progress.classList.remove("indeterminate");
   syncIcon.classList.toggle("active", Boolean(data.syncing));
 
-  if (data.syncing) {
+  const onlinePeers = asNumber(data.peer_count);
+  if (data.bootstrap_enabled && onlinePeers === 0) {
+    setText("sync-label", "Connecting to the network");
+    setText("sync-detail", data.bootstrap_error ? "Public seeds are being retried" : "Discovering public peers");
+    progress.style.width = "35%";
+    progress.classList.add("indeterminate");
+    syncIcon.classList.add("active");
+  } else if (data.syncing) {
     setText("sync-label", "Synchronizing chain");
     setText("sync-detail", reportedBest > localHeight
       ? `Local #${localHeight.toLocaleString()} of #${reportedBest.toLocaleString()}`
@@ -360,7 +369,7 @@ function renderSync(data) {
     progress.style.width = "100%";
   }
 
-  setText("network-sync", data.syncing ? `Syncing ${localHeight.toLocaleString()} / ${bestHeight.toLocaleString()}` : "Synchronized");
+  setText("network-sync", onlinePeers === 0 ? "Waiting for peers" : data.syncing ? `Syncing ${localHeight.toLocaleString()} / ${bestHeight.toLocaleString()}` : "Synchronized");
 }
 
 function renderDashboard(data) {
@@ -394,7 +403,7 @@ function renderDashboard(data) {
   const statusDot = $("status-dot");
   statusDot.classList.toggle("error", Boolean(data.last_error));
   statusDot.classList.toggle("syncing", !data.last_error && Boolean(data.syncing));
-  setText("node-state-label", data.last_error ? "Node warning" : data.syncing ? "Synchronizing" : "Node active");
+  setText("node-state-label", data.last_error ? "Node warning" : asNumber(data.peer_count) === 0 && data.bootstrap_enabled ? "Finding network" : data.syncing ? "Synchronizing" : "Node active");
 
   renderSync(data);
   renderMining(data);
@@ -402,6 +411,17 @@ function renderDashboard(data) {
   renderPeers(peers);
 
   setText("network-protocol", data.protocol || "Unknown");
+  const bootstrapState = !data.bootstrap_enabled
+    ? "Disabled"
+    : asNumber(data.peer_count) > 0
+      ? "Connected"
+      : data.bootstrap_ready
+        ? "Seeds loaded"
+        : data.bootstrap_error
+          ? "Retrying"
+          : "Discovering";
+  setText("network-bootstrap", bootstrapState);
+  $("network-bootstrap").title = String(data.bootstrap_error || "");
   setText("network-listen", data.listen_address || "Not listening");
   setText("database-path", data.database_path || "Unavailable");
   $("database-path").title = String(data.database_path || "");

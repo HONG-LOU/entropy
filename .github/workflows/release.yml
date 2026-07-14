@@ -42,6 +42,8 @@ jobs:
           path: |
             build/bin/Entropy.exe
             build/bin/entropy-amd64-installer.exe
+            build/bin/entropy-cli.exe
+            build/bin/entropy-windows-seed-deploy.zip
             build/bin/SHA256SUMS.txt
 
       - uses: softprops/action-gh-release@v2
@@ -51,4 +53,6 @@ jobs:
           files: |
             build/bin/Entropy.exe
             build/bin/entropy-amd64-installer.exe
+            build/bin/entropy-cli.exe
+            build/bin/entropy-windows-seed-deploy.zip
             build/bin/SHA256SUMS.txt

@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"entropy/internal/core"
@@ -40,6 +42,28 @@ func TestStateAndWalletRoundTrip(t *testing.T) {
 	}
 	if _, _, err := storage.LoadLegacyState(); err == nil {
 		t.Fatal("corrupt state was silently accepted")
+	}
+}
+
+func TestPublishedTestnetChainJSONIsNeverImported(t *testing.T) {
+	directory := t.TempDir()
+	state := core.NewState()
+	state.Blocks[0].Timestamp = 1783900800
+	state.Blocks[0].Hash = state.Blocks[0].ComputeHash()
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "chain.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := New(directory).LoadLegacyState(); err == nil || found || !strings.Contains(err.Error(), core.NetworkID) {
+		t.Fatalf("testnet chain import = found %v, err %v", found, err)
+	}
+	unchanged, err := os.ReadFile(path)
+	if err != nil || string(unchanged) != string(data) {
+		t.Fatalf("rejected testnet chain was modified: %v", err)
 	}
 }
 

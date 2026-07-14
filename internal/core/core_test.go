@@ -36,15 +36,55 @@ func TestEmissionIsExactlyTwoMillionENT(t *testing.T) {
 	}
 }
 
-func TestCoinbaseMaturityActivationBoundary(t *testing.T) {
+func TestMainnetIdentityAndGenesis(t *testing.T) {
+	if NetworkID != "entropy-mainnet-v1" {
+		t.Fatalf("network ID = %q", NetworkID)
+	}
+	genesis := GenesisBlock()
+	if genesis.Timestamp != 1783983600 || genesis.Height != 0 || genesis.Difficulty != 0 || len(genesis.Transactions) != 0 {
+		t.Fatalf("unexpected mainnet genesis: %#v", genesis)
+	}
+	const expectedHash = "f58101a2332dbffff670b4b2f8d08deea08883e0719df9b008b7eb1c8d5b2f0e"
+	if genesis.Hash != expectedHash {
+		t.Fatalf("mainnet genesis hash = %s, want %s", genesis.Hash, expectedHash)
+	}
+	previousTestnet := genesis
+	previousTestnet.Timestamp = 1783900800
+	previousTestnet.Hash = previousTestnet.ComputeHash()
+	if previousTestnet.Hash == genesis.Hash {
+		t.Fatal("mainnet reused the published testnet genesis")
+	}
+	var legacyBlock encoder
+	legacyBlock.uint32(genesis.Version)
+	legacyBlock.uint64(genesis.Height)
+	legacyBlock.int64(genesis.Timestamp)
+	legacyBlock.string(genesis.PreviousHash)
+	legacyBlock.string(genesis.MerkleRoot)
+	legacyBlock.uint8(genesis.Difficulty)
+	legacyBlock.uint64(genesis.Nonce)
+	if genesis.Hash == hashHex(legacyBlock.Bytes()) {
+		t.Fatal("block hash is not separated by the mainnet network ID")
+	}
+	domainTransaction := Transaction{Coinbase: true, Nonce: 42}
+	var legacyTransaction encoder
+	legacyTransaction.bool(domainTransaction.Coinbase)
+	legacyTransaction.uint64(domainTransaction.Nonce)
+	legacyTransaction.uint64(0)
+	legacyTransaction.uint64(0)
+	if domainTransaction.ComputeID() == hashHex(legacyTransaction.Bytes()) {
+		t.Fatal("transaction ID is not separated by the mainnet network ID")
+	}
+}
+
+func TestCoinbaseMaturityFromFirstRewardBlock(t *testing.T) {
 	tests := []struct {
 		name           string
 		createdHeight  uint64
 		spendingHeight uint64
 		wantMature     bool
 	}{
-		{name: "legacy before activation", createdHeight: 1, spendingHeight: 99, wantMature: true},
-		{name: "activation boundary rejects", createdHeight: 1, spendingHeight: 100, wantMature: false},
+		{name: "same block", createdHeight: 1, spendingHeight: 1, wantMature: false},
+		{name: "ninety nine blocks", createdHeight: 1, spendingHeight: 100, wantMature: false},
 		{name: "exactly one hundred blocks", createdHeight: 1, spendingHeight: 101, wantMature: true},
 		{name: "height regression", createdHeight: 101, spendingHeight: 99, wantMature: false},
 		{name: "overflow safe", createdHeight: math.MaxUint64 - 50, spendingHeight: math.MaxUint64, wantMature: false},
@@ -72,11 +112,8 @@ func TestCoinbaseMaturityActivationBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	origins := outputOrigins{outpoint: {CreatedHeight: 1, Coinbase: true}}
-	if err := validateCoinbaseMaturity(transaction, origins, 99); err != nil {
-		t.Fatalf("legacy transaction was rejected before activation: %v", err)
-	}
-	if err := validateCoinbaseMaturity(transaction, origins, 100); err == nil {
-		t.Fatal("immature coinbase transaction was accepted at activation")
+	if err := validateCoinbaseMaturity(transaction, origins, 2); err == nil {
+		t.Fatal("mainnet accepted an immature coinbase near genesis")
 	}
 	if err := validateCoinbaseMaturity(transaction, origins, 101); err != nil {
 		t.Fatalf("mature coinbase transaction was rejected: %v", err)
@@ -148,17 +185,11 @@ func TestMineTransferAndRejectTampering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := NewState()
-	if _, err := state.Mine(context.Background(), alice.Address); err != nil {
-		t.Fatalf("mine first block: %v", err)
-	}
 
 	amount := uint64(2 * UnitsPerENT / 100)
 	fee := uint64(UnitsPerENT / 1000)
-	utxo, err := state.SpendableUTXO()
-	if err != nil {
-		t.Fatal(err)
-	}
+	outpoint := Outpoint{TxID: strings.Repeat("c", 64), Index: 0}
+	utxo := UTXO{outpoint: {Amount: Subsidy(1), Address: alice.Address}}
 	tx, err := BuildTransaction(alice, bob.Address, amount, fee, utxo)
 	if err != nil {
 		t.Fatalf("build transaction: %v", err)
@@ -175,29 +206,26 @@ func TestMineTransferAndRejectTampering(t *testing.T) {
 		t.Fatal(err)
 	}
 	highS.ID = highS.ComputeID()
-	if err := state.AddPending(highS); err == nil {
+	if _, err := validateRegularTransaction(highS, utxo); err == nil {
 		t.Fatal("high-S transaction signature was accepted")
 	}
-	if err := state.AddPending(tx); err != nil {
-		t.Fatalf("add pending transaction: %v", err)
-	}
-	if balance, err := state.Balance(bob.Address, true); err != nil || balance != amount {
-		t.Fatalf("pending Bob balance = %d, err %v", balance, err)
-	}
-	if _, err := state.Mine(context.Background(), bob.Address); err != nil {
-		t.Fatalf("mine confirmation block: %v", err)
-	}
-	if balance, err := state.Balance(bob.Address, false); err != nil || balance != amount+Subsidy(2)+fee {
-		t.Fatalf("confirmed Bob balance = %d, err %v", balance, err)
+	if gotFee, err := validateRegularTransaction(tx, utxo); err != nil || gotFee != fee {
+		t.Fatalf("valid signed transaction = fee %d, err %v", gotFee, err)
 	}
 
-	tampered := *state
-	tampered.Blocks = append([]Block(nil), state.Blocks...)
-	tampered.Blocks[2].Transactions = append([]Transaction(nil), state.Blocks[2].Transactions...)
-	tampered.Blocks[2].Transactions[1].Outputs = append([]TxOutput(nil), state.Blocks[2].Transactions[1].Outputs...)
-	tampered.Blocks[2].Transactions[1].Outputs[0].Amount++
-	if err := tampered.Validate(); err == nil {
+	tampered := tx
+	tampered.Outputs = append([]TxOutput(nil), tx.Outputs...)
+	tampered.Outputs[0].Amount++
+	if _, err := validateRegularTransaction(tampered, utxo); err == nil {
 		t.Fatal("tampered transaction was accepted")
+	}
+
+	state := NewState()
+	if _, err := state.Mine(context.Background(), alice.Address); err != nil {
+		t.Fatalf("mine first mainnet block: %v", err)
+	}
+	if err := state.Validate(); err != nil {
+		t.Fatalf("validate mined mainnet block: %v", err)
 	}
 }
 
@@ -234,30 +262,18 @@ func TestMixedCaseAddressOutputRemainsSpendable(t *testing.T) {
 	if !AddressesEqual(mixedCase, recipient.Address) {
 		t.Fatal("mixed-case address was not equivalent to its canonical form")
 	}
-	state := NewState()
-	if _, err := state.Mine(context.Background(), owner.Address); err != nil {
-		t.Fatal(err)
-	}
-	utxo, err := state.SpendableUTXO()
-	if err != nil {
-		t.Fatal(err)
-	}
+	outpoint := Outpoint{TxID: strings.Repeat("d", 64), Index: 0}
+	utxo := UTXO{outpoint: {Amount: Subsidy(1), Address: owner.Address}}
 	amount := Subsidy(1) / 2
 	receive, err := BuildTransaction(owner, mixedCase, amount, 0, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := state.AddPending(receive); err != nil {
+	if _, err := validateRegularTransaction(receive, utxo); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := state.Mine(context.Background(), owner.Address); err != nil {
-		t.Fatal(err)
-	}
-	if balance, err := state.Balance(recipient.Address, false); err != nil || balance != amount {
-		t.Fatalf("canonical balance for mixed-case output = %d, err %v", balance, err)
-	}
-	utxo, err = state.SpendableUTXO()
-	if err != nil {
+	origins := outputOrigins{outpoint: {CreatedHeight: 1}}
+	if err := applyRegularTransaction(receive, utxo, origins, 2); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := BuildTransaction(recipient, owner.Address, amount, 0, utxo); err != nil {

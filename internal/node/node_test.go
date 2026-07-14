@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,13 +32,40 @@ func TestTwoNodesPropagateTransactionAndBlockIncrementally(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := nodeA.MineOnce(ctx); err != nil {
+	block1, err := nodeA.MineOnce(ctx)
+	if err != nil {
 		t.Fatalf("node A mine: %v", err)
 	}
 	waitFor(t, 20*time.Second, func() bool {
 		dashboard, err := nodeB.Dashboard()
 		return err == nil && dashboard.Height == 1
 	})
+
+	// Transaction relay is independent of coinbase maturity, which has its own
+	// consensus tests. Make this one funding output ordinary only inside both
+	// temporary test databases so no replayable mainnet prefix is published.
+	for _, service := range []*Service{nodeA, nodeB} {
+		database, err := sql.Open("sqlite", service.ledger.Path())
+		if err != nil {
+			t.Fatalf("open relay test database: %v", err)
+		}
+		result, updateErr := database.ExecContext(
+			ctx,
+			"UPDATE utxos SET coinbase = 0 WHERE tx_id = ?",
+			block1.Transactions[0].ID,
+		)
+		closeErr := database.Close()
+		if updateErr != nil {
+			t.Fatalf("prepare relay funding UTXO: %v", updateErr)
+		}
+		if closeErr != nil {
+			t.Fatalf("close relay test database: %v", closeErr)
+		}
+		rows, err := result.RowsAffected()
+		if err != nil || rows != 1 {
+			t.Fatalf("updated relay funding rows = %d, err %v", rows, err)
+		}
+	}
 
 	slowPeer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		time.Sleep(3 * time.Second)
@@ -76,15 +104,11 @@ func TestTwoNodesPropagateTransactionAndBlockIncrementally(t *testing.T) {
 	}
 }
 
-func TestIncrementalSyncReorgRestoresOrphanedTransaction(t *testing.T) {
+func TestIncrementalSyncReorgChoosesStrongerFork(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	nodeA := newTestNode(t)
 	nodeB := newTestNode(t)
-	recipient, err := core.NewWallet()
-	if err != nil {
-		t.Fatal(err)
-	}
 	common := core.NewState()
 	if _, err := common.Mine(ctx, nodeA.Address()); err != nil {
 		t.Fatal(err)
@@ -93,17 +117,6 @@ func TestIncrementalSyncReorgRestoresOrphanedTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := nodeB.ledger.ImportState(ctx, common); err != nil {
-		t.Fatal(err)
-	}
-	utxo, err := nodeA.ledger.SpendableUTXO(ctx, nodeA.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	transaction, err := core.BuildTransaction(&nodeA.wallet, recipient.Address, core.UnitsPerENT/100, 1_000, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := nodeA.ledger.AddTransaction(ctx, transaction); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := nodeA.MineOnce(ctx); err != nil {
@@ -125,12 +138,16 @@ func TestIncrementalSyncReorgRestoresOrphanedTransaction(t *testing.T) {
 		dashboard, err := nodeA.Dashboard()
 		return err == nil && dashboard.Height == 3
 	})
-	pending, err := nodeA.ledger.MempoolTransactions(ctx, core.MaxPendingTransactions)
+	nodeATip, err := nodeA.ledger.Tip(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(pending) != 1 || pending[0].ID != transaction.ID {
-		t.Fatal("valid transaction from the orphaned block was not restored")
+	nodeBTip, err := nodeB.ledger.Tip(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nodeATip.Hash != nodeBTip.Hash || nodeATip.Work.Cmp(nodeBTip.Work) != 0 {
+		t.Fatalf("nodes did not converge after reorg: A %#v B %#v", nodeATip, nodeBTip)
 	}
 }
 

@@ -158,6 +158,7 @@ func (tx *Transaction) sign(wallet *Wallet, previousOutputs []TxOutput) error {
 }
 
 func encodeTransaction(e *encoder, tx Transaction, includeSignatures bool) {
+	e.string(NetworkID)
 	e.bool(tx.Coinbase)
 	e.uint64(tx.Nonce)
 	e.uint64(uint64(len(tx.Inputs)))

@@ -13,43 +13,42 @@ func TestMixedCaseAddressIndexesRemainSpendable(t *testing.T) {
 	owner := newTestWallet(t)
 	recipient := newTestWallet(t)
 	mixedCase := recipient.Address[:4] + strings.ToUpper(recipient.Address[4:])
-	state := core.NewState()
-	if _, err := state.Mine(ctx, owner.Address); err != nil {
-		t.Fatal(err)
-	}
-	utxo, err := state.SpendableUTXO()
-	if err != nil {
-		t.Fatal(err)
-	}
-	amount := core.Subsidy(1) / 2
-	receive, err := core.BuildTransaction(owner, mixedCase, amount, 0, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := state.AddPending(receive); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := state.Mine(ctx, owner.Address); err != nil {
-		t.Fatal(err)
-	}
-
 	chain, err := Open(ctx, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chain.Close()
-	if err := chain.ImportState(ctx, state); err != nil {
+	fundingID := strings.Repeat("e", 64)
+	const fundingAmount uint64 = 100_000
+	if _, err := chain.database.ExecContext(ctx, `
+		INSERT INTO utxos(tx_id, output_index, amount, address, created_height, coinbase)
+		VALUES(?, 0, ?, ?, 0, 0)
+	`, fundingID, int64(fundingAmount), owner.Address); err != nil {
+		t.Fatal(err)
+	}
+	receiveAmount := uint64(50_000)
+	receive, err := core.BuildTransaction(owner, mixedCase, receiveAmount, MinimumRelayFeePerKibiByte, core.UTXO{
+		{TxID: fundingID, Index: 0}: {Amount: fundingAmount, Address: owner.Address},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := chain.AddTransaction(ctx, receive); err != nil {
+		t.Fatal(err)
+	}
+	block, tip := mineLedgerCandidate(t, chain, owner.Address)
+	if err := chain.CommitMinedBlock(ctx, block, tip); err != nil {
 		t.Fatal(err)
 	}
 	confirmed, spendable, err := chain.Balances(ctx, recipient.Address)
-	if err != nil || confirmed != amount || spendable != amount {
+	if err != nil || confirmed != receiveAmount || spendable != receiveAmount {
 		t.Fatalf("canonical ledger balances = %d/%d, err %v", confirmed, spendable, err)
 	}
 	spendableUTXO, err := chain.SpendableUTXO(ctx, recipient.Address)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spend, err := core.BuildTransaction(recipient, owner.Address, amount-MinimumRelayFeePerKibiByte, MinimumRelayFeePerKibiByte, spendableUTXO)
+	spend, err := core.BuildTransaction(recipient, owner.Address, receiveAmount-MinimumRelayFeePerKibiByte, MinimumRelayFeePerKibiByte, spendableUTXO)
 	if err != nil {
 		t.Fatalf("build spend from mixed-case indexed output: %v", err)
 	}

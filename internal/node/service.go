@@ -20,22 +20,29 @@ import (
 const DefaultListenAddress = "0.0.0.0:47821"
 
 type Config struct {
-	DataDirectory    string
-	ListenAddress    string
-	SyncInterval     time.Duration
-	DisableDiscovery bool
-	PruneDepth       uint64
-	PruneDepthSet    bool
-	FallbackPort     bool
+	DataDirectory         string
+	ListenAddress         string
+	SyncInterval          time.Duration
+	DisableDiscovery      bool
+	PruneDepth            uint64
+	PruneDepthSet         bool
+	InitialPruneDepth     uint64
+	FallbackPort          bool
+	BootstrapPeers        []string
+	BootstrapManifestURLs []string
+	MaxOutboundPeers      int
+	TrustLoopbackProxy    bool
 }
 
 type Service struct {
 	mu                 sync.RWMutex
+	peerMutationMu     sync.Mutex
 	ledger             *ledger.Ledger
 	material           *vault.Material
 	wallet             core.Wallet
 	store              *store.Store
 	peers              map[string]*peerState
+	activeOutbound     map[string]struct{}
 	sockets            map[*peerSocket]struct{}
 	outboundSockets    map[string]*peerSocket
 	listenAddress      string
@@ -69,8 +76,16 @@ type Service struct {
 	resyncRequired     bool
 	closing            bool
 	syncInterval       time.Duration
+	maxOutboundPeers   int
 	disableDiscovery   bool
 	fallbackPort       bool
+	trustLoopbackProxy bool
+	bootstrapPeers     []string
+	bootstrapURLs      []string
+	bootstrapAttempt   time.Time
+	bootstrapSuccess   time.Time
+	bootstrapError     string
+	peerExchangeNext   map[string]time.Time
 	walletNeedsBackup  bool
 	walletGeneration   uint64
 	closeDone          chan struct{}
@@ -107,6 +122,10 @@ type Dashboard struct {
 	PruneDepth          uint64         `json:"prune_depth"`
 	ArchiveMode         bool           `json:"archive_mode"`
 	WalletNeedsBackup   bool           `json:"wallet_needs_backup"`
+	BootstrapEnabled    bool           `json:"bootstrap_enabled"`
+	BootstrapReady      bool           `json:"bootstrap_ready"`
+	BootstrapLastUpdate int64          `json:"bootstrap_last_update,omitempty"`
+	BootstrapError      string         `json:"bootstrap_error,omitempty"`
 	RecentBlocks        []BlockSummary `json:"recent_blocks"`
 }
 
@@ -119,12 +138,16 @@ type BlockSummary struct {
 }
 
 type PeerSummary struct {
-	URL        string `json:"url"`
-	Online     bool   `json:"online"`
-	Height     uint64 `json:"height"`
-	Failures   int    `json:"failures"`
-	LastError  string `json:"last_error,omitempty"`
-	Discovered bool   `json:"discovered"`
+	URL            string `json:"url"`
+	Online         bool   `json:"online"`
+	Height         uint64 `json:"height"`
+	Failures       int    `json:"failures"`
+	LastError      string `json:"last_error,omitempty"`
+	Discovered     bool   `json:"discovered"`
+	Public         bool   `json:"public"`
+	Bootstrap      bool   `json:"bootstrap"`
+	ActiveOutbound bool   `json:"active_outbound"`
+	LastSeen       int64  `json:"last_seen,omitempty"`
 }
 
 type TransactionSummary struct {
@@ -160,7 +183,21 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 		config.ListenAddress = DefaultListenAddress
 	}
 	if config.SyncInterval <= 0 {
-		config.SyncInterval = time.Second
+		config.SyncInterval = defaultPeerSyncInterval
+	}
+	if config.MaxOutboundPeers <= 0 {
+		config.MaxOutboundPeers = defaultMaxOutboundPeers
+	}
+	if config.MaxOutboundPeers > maxPeerConnections {
+		return nil, fmt.Errorf("maximum outbound peers must not exceed %d", maxPeerConnections)
+	}
+	bootstrapPeers, err := normalizeBootstrapPeers(config.BootstrapPeers)
+	if err != nil {
+		return nil, err
+	}
+	bootstrapURLs, err := normalizeBootstrapManifestURLs(config.BootstrapManifestURLs)
+	if err != nil {
+		return nil, err
 	}
 	existingData, err := nodeDataExists(config.DataDirectory)
 	if err != nil {
@@ -213,6 +250,11 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 			return nil, err
 		}
 		pruneDepth = config.PruneDepth
+	} else if !existingData && config.InitialPruneDepth > 0 {
+		if err := chain.SetPruneDepth(ctx, config.InitialPruneDepth); err != nil {
+			return nil, err
+		}
+		pruneDepth = config.InitialPruneDepth
 	}
 	storedPeers, err := chain.Peers(ctx)
 	if err != nil {
@@ -224,6 +266,7 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 		wallet:             material.Wallet,
 		store:              storage,
 		peers:              make(map[string]*peerState),
+		activeOutbound:     make(map[string]struct{}),
 		sockets:            make(map[*peerSocket]struct{}),
 		outboundSockets:    make(map[string]*peerSocket),
 		listenAddress:      config.ListenAddress,
@@ -244,8 +287,13 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 		mempoolOffsets:     make(map[string]int),
 		directoryLock:      directoryLock,
 		syncInterval:       config.SyncInterval,
+		maxOutboundPeers:   config.MaxOutboundPeers,
 		disableDiscovery:   config.DisableDiscovery,
 		fallbackPort:       config.FallbackPort,
+		trustLoopbackProxy: config.TrustLoopbackProxy,
+		bootstrapPeers:     bootstrapPeers,
+		bootstrapURLs:      bootstrapURLs,
+		peerExchangeNext:   make(map[string]time.Time),
 		walletNeedsBackup:  walletState.Created || !walletRecoveryConfirmed(storage, material.Wallet.Address),
 		walletGeneration:   1,
 		closeDone:          make(chan struct{}),
@@ -263,6 +311,7 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 		}
 		peer, normalizeErr := normalizePeer(record.URL)
 		if normalizeErr == nil {
+			_, publicErr := normalizePublicPeer(peer)
 			service.peers[peer] = &peerState{
 				URL:         peer,
 				Failures:    record.Failures,
@@ -270,10 +319,27 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 				LastSeen:    record.LastSeen,
 				NextAttempt: record.NextAttempt,
 				Discovered:  !record.Manual,
+				Public:      publicErr == nil,
 			}
 			if !record.Manual {
 				discoveredPeers++
 			}
+		}
+	}
+	for _, peer := range bootstrapPeers {
+		state := service.peers[peer]
+		if state == nil {
+			if len(service.peers) >= maxPeerConnections || service.discoveredPeerCountLocked() >= maxDiscoveredPeers {
+				return nil, fmt.Errorf("bootstrap peer limit reached")
+			}
+			_, publicErr := normalizePublicPeer(peer)
+			state = &peerState{URL: peer, Discovered: true, Public: publicErr == nil, Bootstrap: true}
+			service.peers[peer] = state
+		} else if state.Discovered {
+			state.Bootstrap = true
+		}
+		if err := chain.UpsertPeer(ctx, peer, false); err != nil {
+			return nil, err
 		}
 	}
 	keepResources = true
@@ -340,6 +406,10 @@ func (s *Service) Start(parent context.Context) error {
 		}
 	}()
 	go s.syncLoop(ctx)
+	if len(s.bootstrapURLs) > 0 {
+		s.wait.Add(1)
+		go s.bootstrapLoop(ctx)
+	}
 	if !s.disableDiscovery {
 		s.wait.Add(1)
 		go s.discoveryLoop(ctx)
@@ -401,7 +471,7 @@ func (s *Service) Close(ctx context.Context) error {
 	s.mu.Unlock()
 
 	for _, socket := range sockets {
-		socket.close()
+		socket.stop()
 	}
 	var shutdownErr error
 	if server != nil {
@@ -483,6 +553,13 @@ func (s *Service) Dashboard() (Dashboard, error) {
 	lastError := s.lastError
 	walletNeedsBackup := s.walletNeedsBackup
 	pruneDepth := s.pruneDepth
+	bootstrapEnabled := len(s.bootstrapPeers) > 0 || len(s.bootstrapURLs) > 0
+	bootstrapReady := len(s.bootstrapPeers) > 0 || !s.bootstrapSuccess.IsZero()
+	bootstrapLastUpdate := int64(0)
+	if !s.bootstrapSuccess.IsZero() {
+		bootstrapLastUpdate = s.bootstrapSuccess.Unix()
+	}
+	bootstrapError := s.bootstrapError
 	s.mu.Unlock()
 	defer s.wait.Done()
 
@@ -520,8 +597,9 @@ func (s *Service) Dashboard() (Dashboard, error) {
 	}
 	online := 0
 	bestPeerHeight := uint64(0)
+	recentPeerCutoff := time.Now().Add(-max(3*s.syncInterval, time.Minute)).Unix()
 	for _, peer := range peers {
-		if peer.Online {
+		if peer.Online && peer.ActiveOutbound && peer.LastSeen >= recentPeerCutoff {
 			online++
 		}
 		if peer.Height > bestPeerHeight {
@@ -558,6 +636,10 @@ func (s *Service) Dashboard() (Dashboard, error) {
 		PruneDepth:          pruneDepth,
 		ArchiveMode:         prunedThrough == 0 && pruneDepth == 0,
 		WalletNeedsBackup:   walletNeedsBackup,
+		BootstrapEnabled:    bootstrapEnabled,
+		BootstrapReady:      bootstrapReady,
+		BootstrapLastUpdate: bootstrapLastUpdate,
+		BootstrapError:      bootstrapError,
 		RecentBlocks:        recent,
 	}, nil
 }
@@ -889,13 +971,21 @@ func (s *Service) launch(task func()) {
 func (s *Service) peerSummariesLocked() []PeerSummary {
 	peers := make([]PeerSummary, 0, len(s.peers))
 	for _, peer := range s.peers {
+		lastSeen := int64(0)
+		if !peer.LastSeen.IsZero() {
+			lastSeen = peer.LastSeen.Unix()
+		}
 		peers = append(peers, PeerSummary{
-			URL:        peer.URL,
-			Online:     peer.Online,
-			Height:     peer.Height,
-			Failures:   peer.Failures,
-			LastError:  peer.LastError,
-			Discovered: peer.Discovered,
+			URL:            peer.URL,
+			Online:         peer.Online,
+			Height:         peer.Height,
+			Failures:       peer.Failures,
+			LastError:      peer.LastError,
+			Discovered:     peer.Discovered,
+			Public:         peer.Public,
+			Bootstrap:      peer.Bootstrap,
+			ActiveOutbound: peer.ActiveOutbound,
+			LastSeen:       lastSeen,
 		})
 	}
 	sort.Slice(peers, func(i, j int) bool { return peers[i].URL < peers[j].URL })

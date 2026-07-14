@@ -11,7 +11,7 @@ import (
 const (
 	SchemaVersion = 2
 	DatabaseName  = "entropy.db"
-	ProtocolName  = "entropy-testnet-v3"
+	ProtocolName  = core.NetworkID
 )
 
 type Tip struct {

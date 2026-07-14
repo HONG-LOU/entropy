@@ -57,11 +57,50 @@ type stagedBlockFile struct {
 	closeErr   error
 }
 
+type remoteBlockSource interface {
+	requestBlocks(context.Context, blocksRequest) (blocksResponse, error)
+}
+
+type httpRemoteSource struct {
+	service *Service
+	peer    string
+}
+
+func (h httpRemoteSource) requestHeaders(ctx context.Context, request headersRequest) (headersResponse, error) {
+	var response headersResponse
+	err := h.service.postJSON(ctx, h.peer+"/v2/headers", request, maxProtocolBytes, &response)
+	return response, err
+}
+
+func (h httpRemoteSource) requestBlocks(ctx context.Context, request blocksRequest) (blocksResponse, error) {
+	var response blocksResponse
+	maximum := int64(len(request.Hashes))*maxBlockBodyBytes + 64<<10
+	err := h.service.postJSON(ctx, h.peer+"/v2/blocks", request, maximum, &response)
+	return response, err
+}
+
 func (s *Service) stageBlocks(ctx context.Context, peer string, headers []core.Block) (*stagedBlockFile, error) {
 	return s.stageBlocksWithBudget(ctx, peer, headers, maxStagedForkBytes)
 }
 
 func (s *Service) stageBlocksWithBudget(ctx context.Context, peer string, headers []core.Block, budget int64) (*stagedBlockFile, error) {
+	return s.stageBlocksFromSourceWithBudget(ctx, httpRemoteSource{service: s, peer: peer}, headers, budget)
+}
+
+func (s *Service) stageBlocksFromSource(
+	ctx context.Context,
+	source remoteBlockSource,
+	headers []core.Block,
+) (*stagedBlockFile, error) {
+	return s.stageBlocksFromSourceWithBudget(ctx, source, headers, maxStagedForkBytes)
+}
+
+func (s *Service) stageBlocksFromSourceWithBudget(
+	ctx context.Context,
+	source remoteBlockSource,
+	headers []core.Block,
+	budget int64,
+) (*stagedBlockFile, error) {
 	if len(headers) == 0 || len(headers) > maxHeadersPerSync {
 		return nil, fmt.Errorf("staged block count is outside sync limits")
 	}
@@ -100,9 +139,8 @@ func (s *Service) stageBlocksWithBudget(ctx context.Context, peer string, header
 		for _, header := range headers[start:end] {
 			hashes = append(hashes, header.Hash)
 		}
-		var response blocksResponse
-		maximum := int64(len(hashes))*maxBlockBodyBytes + 64<<10
-		if err := s.postJSON(ctx, peer+"/v2/blocks", blocksRequest{Hashes: hashes}, maximum, &response); err != nil {
+		response, err := source.requestBlocks(ctx, blocksRequest{Hashes: hashes})
+		if err != nil {
 			return nil, err
 		}
 		if response.Protocol != ledger.ProtocolName || len(response.Blocks) != len(hashes) {

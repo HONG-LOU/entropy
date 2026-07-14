@@ -1,11 +1,13 @@
 # Security policy
 
-## Testnet warning
+## Mainnet warning
 
-Entropy v0.2 is an unaudited public testnet. ENT is testnet currency and must
-not represent money, deposits, securities, redeemable claims, or other assets
-with real-world value. The project makes no mainnet or production-security
-claim.
+Entropy v1.0.0 uses the compatibility identity `entropy-mainnet-v1`. The word
+`mainnet` identifies which genesis and consensus rules a node accepts; it does
+not mean the implementation is independently audited or production-safe. ENT
+must not represent money, deposits, securities, redeemable claims, or any other
+asset with real-world value unless and until independent audits establish an
+appropriate security basis.
 
 Cryptographic primitives and proof of work do not by themselves make a new
 blockchain economically or operationally secure. Independent review, sustained
@@ -16,11 +18,14 @@ still required.
 
 | Version | Status |
 | --- | --- |
-| `0.2.x` | Current public-testnet line; security fixes accepted |
-| `0.1.x` | Educational MVP; unsupported, migrate before use |
+| `1.0.x` | Current unaudited mainnet-identity line; security fixes accepted |
+| `0.2.x` | Historical public testnet; unsupported |
+| `0.1.x` | Educational testnet MVP; unsupported |
 
-Protocol identity `entropy-testnet-v3` is intentionally incompatible with the
-removed v0.1 whole-state protocol.
+Protocol identity `entropy-mainnet-v1` and its genesis are intentionally
+incompatible with every published testnet. Testnet chains are not migrated or
+replayed. Restore only a verified wallet backup or recovery phrase into the
+isolated mainnet data directory.
 
 ## Report a vulnerability
 
@@ -99,15 +104,19 @@ guaranteed response-time program.
 
 - No independent consensus, cryptography, wallet, P2P, database, installer, or
   desktop-boundary audit has been completed.
-- No built-in TLS, authenticated peer identity, public seed infrastructure,
-  eclipse-resistant peer selection, or automatic NAT traversal is available.
+- The node does not terminate TLS or authenticate peer identity. The optional
+  public-seed deployment package supplies a reverse proxy, but there is no
+  eclipse-resistant peer selection or automatic NAT traversal.
+- Built-in HTTPS manifest delivery is a discovery mechanism, not a trust root or
+  consensus authority. The checked-in empty peer list makes no claim that an
+  active public seed currently exists.
 - Windows binaries are not Authenticode-signed and builds are not yet
   reproducible. Verify published checksums, while understanding their limit.
 - P-256 addresses and mnemonic derivation are Entropy-specific and not Bitcoin
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v0.2. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.0. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.
@@ -129,7 +138,8 @@ guaranteed response-time program.
    desktop, development servers, or data directories with it.
 7. Use multiple independent archive peers for public experiments and monitor
    unexpected tip, peer, database, and reorg behavior.
-8. Keep real funds and real credentials completely separate from this testnet.
+8. Keep real funds and real credentials completely separate from ENT until the
+   implementation has received appropriate independent audits.
 
 See [Node operations](docs/operations.md) for backup, restore, firewall, NAT,
-legacy migration, and pruning procedures.
+testnet-wallet recovery, and pruning procedures.

@@ -1,15 +1,18 @@
 # Entropy node operations
 
-This guide covers the v0.2 Windows desktop node and the headless CLI. Entropy
-is a public testnet. These procedures do not turn it into an audited or
-production-safe monetary system.
+This guide covers the v1.0.0 Windows desktop node, headless CLI, and optional
+public-seed deployment. The network identity is `entropy-mainnet-v1`, but that
+is a compatibility label rather than an audit or production-safety claim. ENT
+must not carry real-world value without appropriate independent audits.
 
 ## Install and launch
 
-Release builds provide two Windows artifacts:
+Release builds provide these Windows artifacts:
 
 - `Entropy.exe`: portable Wails desktop application;
-- `*installer*.exe`: NSIS per-user installer.
+- `*installer*.exe`: NSIS per-user installer;
+- `entropy-cli.exe`: headless node and wallet utility;
+- `entropy-windows-seed-deploy.zip`: archive-seed deployment package.
 
 Verify the artifact against `SHA256SUMS.txt` from the same release before
 running it. Current binaries are not Authenticode-signed, so a checksum proves
@@ -17,10 +20,16 @@ only that the file matches the published release artifact, not that a trusted
 certificate authority verified its publisher.
 
 Double-click the installed shortcut or portable EXE. A clean first launch
-creates the wallet and SQLite ledger under `%LOCALAPPDATA%\Entropy`, starts the
-TCP listener, and searches the LAN for peers. Mining remains off until
-explicitly enabled. Existing `%APPDATA%\Entropy` v0.1/v0.2 data is detected and
-reused during upgrade.
+creates the wallet and SQLite ledger under
+`%LOCALAPPDATA%\Entropy\mainnet-v1`, starts the TCP listener, loads the built-in
+HTTPS bootstrap manifests, and searches the LAN for peers. It is immediately a
+full validating and relaying node; mining remains off until explicitly enabled.
+The fresh desktop ledger retains the newest 20,000 complete block bodies. Later
+launches respect the storage mode already persisted in the database.
+
+Historical testnet state under `%APPDATA%\Entropy` or
+`%LOCALAPPDATA%\Entropy` is never reused as mainnet state. Testnet chains and
+databases must stay outside `mainnet-v1`.
 
 The desktop prefers TCP `47821`. If another process already owns that port it
 starts on a free dynamic port instead and shows the actual listener plus a
@@ -33,20 +42,19 @@ Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 ## Uninstall and retained data
 
 The NSIS uninstaller removes the installed application and shortcuts. It does
-not delete `%LOCALAPPDATA%\Entropy` or a reused `%APPDATA%\Entropy` directory;
-wallet keys, the recovery marker, peer records, and the chain database remain
-available for a later reinstall. Remove active data manually only after
-confirming that the recovery phrase or a portable `.entwallet` backup works.
+not delete `%LOCALAPPDATA%\Entropy\mainnet-v1`; wallet keys, the recovery
+marker, peer records, and the chain database remain available for a later
+reinstall. Remove active data manually only after confirming that the recovery
+phrase or a portable `.entwallet` backup works.
 
-On managed Windows systems the legacy `%APPDATA%` location can roam. Exclude a
-reused Entropy directory from profile replication because copying SQLite WAL
-files between computers is not a supported backup method.
+Do not configure profile replication for the live mainnet directory. Copying
+SQLite WAL files between computers is not a supported backup method.
 
 ## Node count and topologies
 
 ### One computer, one node
 
-One node is a complete isolated testnet. It can mine blocks and create locally
+One node is a complete isolated network. It can mine blocks and create locally
 confirmed transactions, but there is no independent peer to observe relay,
 synchronization, or forks.
 
@@ -97,14 +105,37 @@ query string, or fragment.
 
 ### Public nodes
 
-At least one node must accept internet connections for nodes behind NAT to
-bootstrap. v0.2 has no bundled public seed service, so operators exchange and
-add reachable peer URLs manually.
+At least one node must accept internet connections for nodes behind NAT to join
+across the public internet. Desktop and CLI nodes fetch built-in HTTPS bootstrap
+manifest sources, but the v1.0.0 manifest contains no peer endpoints and makes
+no claim that an active public seed exists. Until reachable seeds are deployed
+and published, operators must exchange and add peer URLs manually.
 
 An outbound-only node still downloads and independently validates headers,
 blocks, transactions, signatures, proof of work, and monetary rules. It also
 relays to its established outbound peers. It simply cannot accept a new inbound
 connection initiated from the internet.
+
+The release's `entropy-windows-seed-deploy.zip` can install an always-on archive
+node behind Caddy on HTTPS/WSS port 443. Its archive policy is intentional: a
+new peer cannot synchronize from genesis through a pruned seed. Follow
+[the public-seed guide](public-seed.md), verify the endpoint externally, and
+only then add it to `network/mainnet.json`.
+
+After a successful status check, nodes optionally request `/v2/peers`. A node
+advertises at most 16 public peers that are active outbound, currently healthy,
+and seen within two minutes. Exchanged candidates must be globally routable IP
+literals with explicit ports; DNS names and private or special-use addresses
+from this untrusted path are discarded. A controlled bootstrap manifest may use
+a public FQDN, but it must be HTTPS on port 443. Older nodes that return `404` or
+`405` for `/v2/peers` remain usable.
+
+Automatic peer exchange retains at most 24 public candidates and 48 discovered
+peers overall; eight outbound peers are active by default. During catch-up, one
+direct-extension chunk commits at most eight blocks. A 30-second scheduled sync
+session attempts no more than 32 chunks, or 256 directly extending blocks, and
+stops starting chunks when less than five seconds remain. Later sessions resume
+from the committed tip.
 
 ## Windows Firewall, router, and NAT
 
@@ -144,6 +175,11 @@ authentication. A TLS reverse proxy may provide HTTPS/WSS if it passes WebSocket
 upgrades and preserves the bounded endpoint behavior. Do not expose unrelated
 administrative services on the same port.
 
+Bootstrap manifests accept public peer endpoints only over HTTPS on TCP 443.
+The Windows seed package therefore binds the node to loopback on `47821` and
+opens only Caddy's TCP 443 firewall rule; do not expose that seed's loopback
+listener directly.
+
 ## CLI reference
 
 Build once:
@@ -153,14 +189,16 @@ go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
 ```
 
 Each command accepts `--data <directory>`. When omitted, Windows uses
-the active default data directory. Each data directory has an exclusive lock, so stop the
-desktop app or existing CLI node before opening the same directory.
+`%LOCALAPPDATA%\Entropy\mainnet-v1`. Each data directory has an exclusive lock,
+so stop the desktop app or existing CLI node before opening the same directory.
 
 ### `node`
 
 ```text
 entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
                  [--mine] [--prune-depth BLOCKS] [--no-discovery]
+                 [--bootstrap-manifest HTTPS_URL] [--no-bootstrap]
+                 [--trust-loopback-proxy]
 ```
 
 | Option | Meaning |
@@ -170,6 +208,9 @@ entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
 | `--mine` | Begin CPU mining immediately |
 | `--prune-depth` | Explicitly persist `0` for archive, or retain `120..31,536,000` recent bodies |
 | `--no-discovery` | Disable LAN multicast send and receive for this run |
+| `--bootstrap-manifest` | Replace built-in manifest sources; repeat for fallback HTTPS URLs |
+| `--no-bootstrap` | Disable HTTPS manifest fetching for an isolated/manual topology |
+| `--trust-loopback-proxy` | Trust the seed proxy's client-IP header only from a loopback TCP peer |
 
 When `--prune-depth` is omitted, the node keeps the storage policy already
 recorded in its SQLite database. A fresh database defaults to archive mode.
@@ -220,34 +261,33 @@ It refuses to silently replace malformed wallet state.
 
 ### `wallet-migrate`
 
-Use this only when a v0.1 plaintext `wallet.json` prevents startup:
+Use this only to convert a v0.1 plaintext `wallet.json` in a copied historical
+data directory into a portable encrypted backup:
 
 ```powershell
 $env:ENTROPY_WALLET_PASSWORD = Read-Host "Backup password"
 .\build\bin\entropy-cli.exe wallet-migrate `
-  --data "$env:LOCALAPPDATA\Entropy" `
+  --data D:\Backups\entropy-testnet-v01 `
   --output E:\Backups\entropy-legacy-wallet.entwallet
 Remove-Item Env:\ENTROPY_WALLET_PASSWORD
 ```
 
-The migration preserves the old P-256 key and address. There is intentionally
-no CLI restore command in v0.2; restore backups or recovery phrases from the
-desktop Wallet view.
+The migration preserves the old P-256 key and address but does not migrate its
+testnet chain. There is intentionally no CLI restore command in v1.0.0; start
+the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
 
 The default Windows layout is:
 
 ```text
-%LOCALAPPDATA%\Entropy\
+%LOCALAPPDATA%\Entropy\mainnet-v1\
   entropy.db                       SQLite ledger and indexes
   entropy.db-wal                   live WAL, normally checkpointed on shutdown
   entropy.db-shm                   live SQLite shared-memory file
   wallet.vault                     DPAPI-protected active wallet
   wallet.recovery-confirmed        local backup acknowledgement marker
   node.lock                        exclusive process lock
-  chain.json.migrated.bak          retained v0.1 chain after migration, if any
-  peers.json.migrated.bak          retained v0.1 peers after migration, if any
 ```
 
 Peer records, mempool, UTXOs, history indexes, health events, prune policy, and
@@ -263,7 +303,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v0.2 wallet
+### New v1.0.0 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -285,7 +325,7 @@ losing account protection may make the copied local vault unusable.
 ### Portable `.entwallet` backup
 
 Portable backups encrypt authenticated wallet material with Argon2id and
-XChaCha20-Poly1305. They support both mnemonic v0.2 wallets and migrated legacy
+XChaCha20-Poly1305. They support mnemonic wallets and migrated legacy
 wallets. Keep the file and password separate. A forgotten password cannot be
 reset by the project.
 
@@ -311,36 +351,32 @@ wallets and does not delete the chain database.
 Migrated v0.1 wallets do not have a phrase. Do not invent one for them; restore
 their `.entwallet` backup instead.
 
-## Legacy v0.1 migration
+## Recover a wallet from a testnet release
 
-Before upgrading, stop v0.1 and copy the whole data directory to offline
-storage. That pre-migration copy contains a plaintext private key, so protect it
-accordingly and securely retire it after verifying the encrypted recovery
-copies. Start v0.2 once.
+Before leaving v0.1 or v0.2, stop it and copy the whole old data directory to
+offline storage. Never place its `chain.json`, `entropy.db`, WAL, mempool, or
+peer files under `%LOCALAPPDATA%\Entropy\mainnet-v1`. Mainnet has a different
+genesis and rejects testnet protocol state rather than importing or replaying
+it.
 
-The chain migrator validates `chain.json`, imports it into SQLite, verifies the
-new height and tip hash, and then renames the old file. Peers follow the same
-import-before-rename rule. A mismatch between a pre-existing SQLite tip and the
-legacy tip is fatal and leaves both copies in place.
+For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
+`.entwallet` backup. For a v0.1 plaintext wallet, run `wallet-migrate` against a
+copy of the old directory; the command validates the key and creates verified
+DPAPI and portable encrypted copies before removing plaintext from that copy.
 
-Plaintext `wallet.json` is handled separately because chain data may be
-recreated but a private key may not. Startup remains blocked until the user
-selects a portable backup destination and supplies a valid password. Migration
-then:
-
-1. Validates the old wallet and records its expected address.
-2. Creates and verifies the portable `.entwallet` backup.
-3. Creates and verifies the DPAPI `wallet.vault` with the same address.
-4. Removes plaintext `wallet.json` only after both encrypted copies verify.
-
-The operation is restartable after interruption and refuses mismatched partial
-copies.
+Then start v1.0.0 normally and restore the phrase or `.entwallet` from the
+desktop Wallet view. This recovers only the P-256 key and address. Mainnet
+balances, spendable outputs, confirmations, and history are derived solely from
+the mainnet chain and begin independently of every testnet balance.
 
 ## Archive and pruning operations
 
-Archive is the fresh-node default and is required for a node intended to serve
-new peers from genesis. It consumes increasing disk space over the ten-year
-schedule but preserves maximum reorg and diagnostic history.
+Archive is the fresh CLI default and is required for a node intended to serve
+new peers from genesis. The public-seed package enforces it. A fresh desktop
+database instead starts with a 20,000-block retention depth and then respects
+the persisted operator choice. Archive consumes increasing disk space over the
+approximately ten-year schedule but preserves maximum reorg and diagnostic
+history.
 
 Pruned mode keeps all headers, UTXOs, address summaries, and current operation
 state while deleting old bodies and undo records. The retention setting is
@@ -373,18 +409,19 @@ ancestor is below the prune horizon is also rejected rather than guessed.
 
 ## Mining and confirmations
 
-The built-in miner uses CPU workers. It is suitable for a small testnet, not an
-efficient production mining deployment. Closing the app or stopping mining
-cancels active work. A found block is committed only if its snapshot tip is
-still current.
+The built-in miner uses CPU workers. It is suitable for this compact network,
+not an efficient production mining deployment. Closing the app or stopping
+mining cancels active work. A found block is committed only if its snapshot tip
+is still current.
 
 Treat mempool receipt as propagation, not settlement. The 10-second interval is
-a target, not a service guarantee. Wait more confirmations for larger testnet
+a target, not a service guarantee. Wait more confirmations for larger
 experiments and expect occasional short reorganizations.
 
-New coinbase output maturity is 100 blocks from activation height 100. The app
-can show a confirmed balance that is larger than the currently spendable
-balance while recent mining rewards mature.
+Coinbase maturity is 100 blocks starting with the first reward at height 1. The
+height-1 output becomes spendable at height 101. The app can therefore show a
+confirmed balance larger than the currently spendable balance while recent
+mining rewards mature.
 
 ## Troubleshooting
 
@@ -401,8 +438,10 @@ let the operating-system lock determine whether the stale file is reusable.
 
 ### `legacy wallet requires encrypted migration`
 
-Complete the desktop migration dialog or run `wallet-migrate`. Keep the chosen
-`.entwallet` file and password; a migrated wallet has no recovery phrase.
+Do not move the old testnet chain into `mainnet-v1`. Run `wallet-migrate` against
+a copy of the historical directory, keep the resulting `.entwallet` and
+password, then restore that backup in the mainnet desktop app. A migrated legacy
+wallet has no recovery phrase.
 
 ### Protected wallet is missing or cannot decrypt
 
@@ -438,4 +477,5 @@ failures as fatal and does not show fake balances or simulated success.
 Opening TCP `47821` exposes a deliberately public P2P parser to untrusted input.
 The implementation applies message, connection, and timeout limits, but has not
 been independently audited. Keep Windows patched, run as a normal user, keep
-wallet backups offline, and read [the security policy](../SECURITY.md).
+wallet backups offline, do not assign real-world value to ENT, and read
+[the security policy](../SECURITY.md).

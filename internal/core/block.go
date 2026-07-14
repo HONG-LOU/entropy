@@ -13,7 +13,9 @@ import (
 	"time"
 )
 
-const genesisTimestamp int64 = 1783900800
+// genesisTimestamp is 2026-07-13 23:00:00 UTC. Mainnet uses a new,
+// reward-free genesis so no previously published testnet history can replay.
+const genesisTimestamp int64 = 1783983600
 
 const MaxMiningWorkers = 1_024
 
@@ -45,6 +47,7 @@ func GenesisBlock() Block {
 
 func (b Block) ComputeHash() string {
 	var e encoder
+	e.string(NetworkID)
 	e.uint32(b.Version)
 	e.uint64(b.Height)
 	e.int64(b.Timestamp)

@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-func TestDefaultDirectoryPrefersLocalButPreservesRoamingData(t *testing.T) {
+func TestDefaultDirectoryAlwaysUsesIsolatedMainnetDirectory(t *testing.T) {
 	root := t.TempDir()
 	localBase := filepath.Join(root, "local")
 	roamingBase := filepath.Join(root, "roaming")
 	t.Setenv("LOCALAPPDATA", localBase)
 	t.Setenv("APPDATA", roamingBase)
 
-	wantLocal := filepath.Join(localBase, "Entropy")
+	wantLocal := filepath.Join(localBase, "Entropy", "mainnet-v1")
 	directory, err := DefaultDirectory()
 	if err != nil || directory != wantLocal {
 		t.Fatalf("clean default directory = %q, err %v, want %q", directory, err, wantLocal)
@@ -28,13 +28,14 @@ func TestDefaultDirectoryPrefersLocalButPreservesRoamingData(t *testing.T) {
 		t.Fatal(err)
 	}
 	directory, err = DefaultDirectory()
-	if err != nil || directory != wantRoaming {
-		t.Fatalf("legacy default directory = %q, err %v, want %q", directory, err, wantRoaming)
+	if err != nil || directory != wantLocal {
+		t.Fatalf("legacy data changed mainnet directory = %q, err %v, want %q", directory, err, wantLocal)
 	}
-	if err := os.MkdirAll(wantLocal, 0o700); err != nil {
+	oldLocal := filepath.Join(localBase, "Entropy")
+	if err := os.MkdirAll(oldLocal, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(wantLocal, "entropy.db"), []byte("current"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(oldLocal, "entropy.db"), []byte("testnet"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	directory, err = DefaultDirectory()
