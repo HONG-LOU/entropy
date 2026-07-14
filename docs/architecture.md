@@ -284,8 +284,8 @@ At startup, desktop and default CLI configurations fetch the versioned mainnet
 bootstrap manifest over HTTPS from the public repository and a CDN mirror. A
 manifest is only a bounded peer-location hint: every peer and every received
 object is still validated locally, and a manifest cannot change consensus. The
-v1.0.0 manifest has an empty peer list and therefore makes no claim that an
-active public seed exists. Startup continues with LAN/manual peers when every
+mainnet manifest publishes `https://template-chat.xyz` as an externally
+verified archive seed. Startup continues with LAN/manual peers when every
 manifest source is empty or unavailable.
 
 See [Mainnet protocol](protocol.md) for endpoint and message details.

@@ -101,8 +101,8 @@ https://cdn.jsdelivr.net/gh/HONG-LOU/entropy@main/network/mainnet.json
 
 The runner passes both URLs to the node bootstrap subsystem. The node validates
 the bounded, versioned `entropy-mainnet-v1` document, refreshes it periodically,
-and persists accepted HTTPS peers in SQLite. `ENTROPY_BOOTSTRAP_PEER` may add one
-explicit peer while the manifest is still empty.
+and persists accepted HTTPS peers in SQLite. `ENTROPY_BOOTSTRAP_PEER` may add
+one explicit peer for recovery when published manifest sources are unavailable.
 
 The equivalent CLI controls are:
 
@@ -196,13 +196,13 @@ copy, stop the node task first. A seed database contains no spending key.
 
 ## Bootstrap manifest publication
 
-The committed manifest starts empty:
+The committed manifest contains only externally verified archive seeds:
 
 ```json
 {
   "version": 1,
   "protocol": "entropy-mainnet-v1",
-  "peers": []
+  "peers": ["https://template-chat.xyz"]
 }
 ```
 
@@ -220,7 +220,7 @@ does not become the accidental network authority.
 
 To upgrade, keep the same `seed.env`, Windows account, and runtime directories.
 Run the new package's `install.ps1` again; it stops and replaces the scheduled
-tasks and binaries, then reuses the ledger and DPAPI wallet.
+tasks and binaries, then reuses the walletless archive ledger.
 
 To remove tasks, firewall rules, binaries, and configuration while retaining
 wallet, chain, certificates, and logs:

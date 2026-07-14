@@ -46,17 +46,16 @@ manifest from built-in HTTPS repository and CDN URLs:
 {
   "version": 1,
   "protocol": "entropy-mainnet-v1",
-  "peers": []
+  "peers": ["https://template-chat.xyz"]
 }
 ```
 
 Manifest URLs locate candidate peers; they do not distribute chain state or
 alter consensus. Public manifest peers must use HTTPS on port 443, and received
-objects are validated exactly like data from manual peers. The v1.0.0 checked-in
-manifest is empty, so it does not assert that an active public seed exists.
-Cross-internet joining currently requires a manual peer or deployment and
-publication of a reachable archive seed. Empty or unavailable manifests do not
-prevent local startup.
+objects are validated exactly like data from manual peers. The checked-in
+manifest publishes an externally verified archive seed, allowing automatic
+cross-internet discovery. Empty or unavailable manifests do not prevent local
+startup.
 
 The built-in server listens on plain TCP, normally port `47821`. A peer base URL
 is `http://host:port` or `https://host:port` without a path. HTTPS peers map to
@@ -363,9 +362,9 @@ network reset.
   connectivity with that address.
 - IP addresses, manually configured URLs, failure times, and errors persist in
   the local database.
-- HTTPS manifest support and an optional Windows seed deployment package are
-  included, but the empty v1.0.0 manifest does not claim an active public seed.
-  No automatic NAT traversal or anonymity layer is included.
+- HTTPS manifest support, an active public archive seed, and an optional
+  Windows seed deployment package are included. No automatic NAT traversal or
+  anonymity layer is included.
 
 Connection limits and strict decoding are defensive controls, not audit
 evidence. Report sensitive issues through the process in

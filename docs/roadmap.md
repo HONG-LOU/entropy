@@ -18,8 +18,8 @@ independent audits and sustained hostile-network evidence exist.
 - Keep the public HTTPS manifest accurate, remove unhealthy endpoints quickly,
   and publish ownership, retention, monitoring, and replacement policy.
 - Exercise full genesis-to-tip bootstrap and archive serving under realistic
-  public traffic and projected database growth. Until this is done, the empty
-  manifest correctly means that no active public seed is being claimed.
+  public traffic and projected database growth. The first public seed is live;
+  this sustained-load evidence and a second independent seed are still needed.
 - Add manifest signing or DNS-based fallback without making any seed operator a
   consensus authority.
 

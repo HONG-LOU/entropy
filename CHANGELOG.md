@@ -9,8 +9,8 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 - Public `entropy-mainnet-v1` network with a new reward-free genesis block.
 - Built-in HTTPS bootstrap-manifest discovery through the public repository and
-  its CDN mirror. The checked-in manifest intentionally contains no peers until
-  independently operated public seeds are deployed and verified.
+  its CDN mirror, with a verified public archive seed at
+  `https://template-chat.xyz`.
 - Optional Windows archive-seed deployment package with Caddy HTTPS/WSS
   termination, service accounts, scheduled startup, firewall setup, health
   checks, and uninstall support.
@@ -42,9 +42,8 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 - Wallet control can be restored on mainnet from a known 24-word recovery phrase
   or verified `.entwallet` backup. Chain/database files must not be copied into
   the mainnet directory.
-- An empty bootstrap manifest means no active public seed is being claimed.
-  Cross-internet joining requires a manually configured peer or an operator to
-  deploy and publish a reachable seed.
+- The published HTTPS archive seed enables automatic cross-internet discovery;
+  manually configured peers remain available for manifest or seed outages.
 
 ### Security status
 

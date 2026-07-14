@@ -216,14 +216,13 @@ directory. Full command examples are in [Operations](docs/operations.md#cli-refe
   listen port.
 
 The application fetches a small versioned bootstrap manifest over HTTPS from
-the public repository, with a CDN mirror as fallback. At the v1.0.0 release the
-checked-in manifest has an empty `peers` array, so the project does **not** claim
-that an active public seed exists. An empty or unreachable manifest is reported
-but does not prevent local startup.
+the public repository, with a CDN mirror as fallback. The checked-in manifest
+publishes the externally verified archive seed `https://template-chat.xyz`, so
+new internet-connected nodes can discover the network without manual peer
+configuration. An empty or unreachable manifest is reported but does not
+prevent local startup.
 
-Cross-internet joining therefore requires either a manually supplied reachable
-peer or an operator to deploy a public seed and then publish its HTTPS URL in
-the manifest. The release includes `entropy-windows-seed-deploy.zip`; see
+The release includes `entropy-windows-seed-deploy.zip`; see
 [Public seed deployment](docs/public-seed.md). The seed package runs an archive
 node behind a Caddy HTTPS/WSS reverse proxy on TCP 443. Direct desktop P2P is
 plain HTTP/WebSocket, has no peer authentication, and does not automatically

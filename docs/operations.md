@@ -107,9 +107,9 @@ query string, or fragment.
 
 At least one node must accept internet connections for nodes behind NAT to join
 across the public internet. Desktop and CLI nodes fetch built-in HTTPS bootstrap
-manifest sources, but the v1.0.0 manifest contains no peer endpoints and makes
-no claim that an active public seed exists. Until reachable seeds are deployed
-and published, operators must exchange and add peer URLs manually.
+manifest sources. The published `https://template-chat.xyz` archive seed lets
+new nodes join without exchanging peer URLs manually. Operators may still add
+manual peers when recovering from a manifest outage.
 
 An outbound-only node still downloads and independently validates headers,
 blocks, transactions, signatures, proof of work, and monetary rules. It also
