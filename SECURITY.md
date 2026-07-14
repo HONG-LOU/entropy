@@ -2,7 +2,7 @@
 
 ## Mainnet warning
 
-Entropy v1.0.0 uses the compatibility identity `entropy-mainnet-v1`. The word
+Entropy v1.0.1 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
 not mean the implementation is independently audited or production-safe. ENT
 must not represent money, deposits, securities, redeemable claims, or any other
@@ -60,9 +60,14 @@ guaranteed response-time program.
 
 - The active local wallet is protected by Windows user-scope DPAPI and is
   decrypted inside the node process when running.
+- On Linux, the active wallet is protected by XChaCha20-Poly1305 with a random
+  master key stored in the current user's Secret Service keyring.
 - A process or user with equivalent Windows-account access may be able to invoke
   DPAPI or inspect process memory. DPAPI is not protection from a compromised
   account or administrator.
+- A process in the same unlocked Linux desktop session may request the Secret
+  Service key or inspect process memory. Secret Service is not protection from
+  a compromised account or administrator.
 - New wallets have a 24-word BIP39 phrase with an Entropy-specific P-256
   derivation. The phrase is the key; anyone who learns it controls the wallet.
 - Portable `.entwallet` backups use Argon2id and XChaCha20-Poly1305. Their
@@ -108,15 +113,14 @@ guaranteed response-time program.
   public-seed deployment package supplies a reverse proxy, but there is no
   eclipse-resistant peer selection or automatic NAT traversal.
 - Built-in HTTPS manifest delivery is a discovery mechanism, not a trust root or
-  consensus authority. The checked-in empty peer list makes no claim that an
-  active public seed currently exists.
+  consensus authority. A published seed cannot change locally validated rules.
 - Windows binaries are not Authenticode-signed and builds are not yet
   reproducible. Verify published checksums, while understanding their limit.
 - P-256 addresses and mnemonic derivation are Entropy-specific and not Bitcoin
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v1.0.0. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.1. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.
@@ -125,7 +129,7 @@ guaranteed response-time program.
 
 ## Operator practices
 
-1. Run as a normal Windows user on a patched system.
+1. Run as a normal OS user on a patched Windows or Ubuntu system.
 2. Record the recovery phrase offline and export a separate encrypted backup
    before receiving or mining ENT.
 3. Never paste a phrase, private key, or backup password into an issue, log,
@@ -134,8 +138,8 @@ guaranteed response-time program.
    live SQLite main file while WAL data may exist.
 5. Verify release checksums and download only from the public repository's
    release page.
-6. Expose only the P2P TCP port. Do not expose Windows file sharing, remote
-   desktop, development servers, or data directories with it.
+6. Expose only the P2P TCP port. Do not expose file sharing, remote desktop,
+   development servers, or data directories with it.
 7. Use multiple independent archive peers for public experiments and monitor
    unexpected tip, peer, database, and reorg behavior.
 8. Keep real funds and real credentials completely separate from ENT until the

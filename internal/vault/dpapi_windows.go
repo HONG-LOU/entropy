@@ -13,7 +13,21 @@ import (
 
 func LocalProtectionAvailable() bool { return true }
 
-func protectLocal(plaintext, entropy []byte) ([]byte, error) {
+func newLocalProtection() (string, cipherDescriptor, error) {
+	return protectionDPAPI, cipherDescriptor{Algorithm: dpapiCipher}, nil
+}
+
+func validateLocalProtection(e envelope) error {
+	if err := e.validateHeader(protectionDPAPI); err != nil {
+		return err
+	}
+	if e.KDF != nil || e.Cipher.Algorithm != dpapiCipher || e.Cipher.Nonce != "" {
+		return fmt.Errorf("%w: invalid DPAPI protection metadata", ErrInvalidVault)
+	}
+	return nil
+}
+
+func protectLocal(plaintext, entropy []byte, _ cipherDescriptor) ([]byte, error) {
 	protected, err := cryptProtectData(plaintext, entropy, true)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrLocalProtectionFailure, err)
@@ -21,7 +35,7 @@ func protectLocal(plaintext, entropy []byte) ([]byte, error) {
 	return protected, nil
 }
 
-func unprotectLocal(ciphertext, entropy []byte) ([]byte, error) {
+func unprotectLocal(ciphertext, entropy []byte, _ cipherDescriptor) ([]byte, error) {
 	plaintext, err := cryptProtectData(ciphertext, entropy, false)
 	if err == nil {
 		return plaintext, nil

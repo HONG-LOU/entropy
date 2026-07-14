@@ -42,8 +42,7 @@ URL. Its actual listener remains `127.0.0.1:47821`, while peers must configure
 ## Prerequisites
 
 - Windows Server 2022 or Windows 10/11 x64 with a static public IP.
-- A dedicated standard Windows user with a non-expiring service password. Sign
-  in once before installation so its profile and DPAPI context exist.
+- A dedicated standard Windows user with a non-expiring service password.
 - An ASCII DNS hostname with direct A/AAAA records for the host. Use DNS-only
   mode, not a CDN proxy.
 - Inbound TCP 443 permitted by the cloud security group and upstream firewall.
@@ -140,9 +139,8 @@ limit, and write bounded or age-pruned logs. Task Scheduler stores the node
 account credential; it is not written to `seed.env`.
 
 Group Policy can prohibit password-backed startup tasks. Treat registration or
-the 45-second DPAPI startup check failing as an installation failure; do not
-switch the node task to SYSTEM because an existing user-scope wallet would no
-longer decrypt.
+the 45-second startup check failing as an installation failure. Keep the
+dedicated account boundary instead of switching the node task to SYSTEM.
 
 ## DNS, firewall, and public verification
 

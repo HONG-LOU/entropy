@@ -3,6 +3,31 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.1] - 2026-07-14
+
+### Added
+
+- Ubuntu 24.04+ amd64 desktop wallet/node package with the same mainnet,
+  recovery phrase, encrypted backup, transaction, synchronization, and mining
+  behavior as the Windows application.
+- Linux local-wallet protection using Secret Service for a user-scoped random
+  master key and XChaCha20-Poly1305 for authenticated `wallet.vault`
+  encryption.
+- Native Linux desktop and CLI binaries, `.deb` packaging, menu integration,
+  and Linux release checksums.
+
+### Changed
+
+- Release automation now builds Windows and Ubuntu artifacts independently and
+  publishes them together only after both platform jobs succeed.
+
+### Compatibility
+
+- `entropy-mainnet-v1`, genesis, consensus, wallet derivation, addresses, and
+  portable `.entwallet` backups are unchanged from v1.0.0.
+- Windows DPAPI vaults remain Windows-local. Move a wallet between Windows and
+  Ubuntu with its 24-word phrase or an encrypted `.entwallet` backup.
+
 ## [1.0.0] - 2026-07-14
 
 ### Added

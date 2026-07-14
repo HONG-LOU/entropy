@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	protectionPassword = "password-v1"
-	protectionDPAPI    = "windows-dpapi-user-v1"
+	protectionPassword      = "password-v1"
+	protectionDPAPI         = "windows-dpapi-user-v1"
+	protectionSecretService = "linux-secret-service-user-v1"
 
-	passwordCipher = "xchacha20-poly1305"
-	dpapiCipher    = "windows-dpapi"
+	passwordCipher      = "xchacha20-poly1305"
+	dpapiCipher         = "windows-dpapi"
+	secretServiceCipher = "xchacha20-poly1305"
 
 	maxEnvelopeBytes = 64 << 10
 	maxSecretBytes   = 16 << 10

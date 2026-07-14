@@ -1,10 +1,10 @@
-# Entropy v1.0.0 architecture
+# Entropy v1.0.1 architecture
 
 ## Scope
 
-Entropy v1.0.0 implements the `entropy-mainnet-v1` network. It is designed so
-one Windows application can be a wallet, a full validator, a relaying peer, and
-an optional proof-of-work miner without an external database service.
+Entropy v1.0.1 implements the `entropy-mainnet-v1` network. It is designed so
+one Windows or Ubuntu application can be a wallet, a full validator, a relaying
+peer, and an optional proof-of-work miner without an external database service.
 
 The phrase "full node" means that the node independently verifies consensus
 rules before changing its active ledger. It does not mean the implementation
@@ -27,7 +27,7 @@ Wails desktop UI                     cmd/entropy CLI
                   /       |       \
                  /        |        \
         internal/core  internal/ledger  internal/vault
-        consensus and  SQLite ledger,   DPAPI wallet,
+        consensus and  SQLite ledger,   OS-protected wallet,
         cryptography    UTXO and undo    backup/recovery
                             |
                      internal/store
@@ -146,8 +146,9 @@ same commit path; neither can bypass validation.
 
 ## SQLite ledger
 
-The ledger is `%LOCALAPPDATA%\Entropy\mainnet-v1\entropy.db` for a clean Windows
-install and uses the pure-Go `modernc.org/sqlite` driver. Connections set:
+The ledger is `%LOCALAPPDATA%\Entropy\mainnet-v1\entropy.db` on Windows and
+`~/.config/Entropy/mainnet-v1/entropy.db` on Ubuntu. It uses the pure-Go
+`modernc.org/sqlite` driver. Connections set:
 
 ```text
 journal_mode = WAL
@@ -331,9 +332,11 @@ then deterministically derives a P-256 private scalar using the versioned
 a Bitcoin wallet path; importing the phrase into unrelated wallet software
 will not produce the Entropy address.
 
-The local `wallet.vault` is encrypted by Windows user-scope DPAPI and opens
-automatically for the same Windows account on the same installation. It is not
-a portable backup. A `.entwallet` backup uses:
+The local `wallet.vault` uses Windows user-scope DPAPI or Linux Secret Service
+plus XChaCha20-Poly1305. It opens automatically only for the same OS account and
+is not a portable backup. The Linux envelope authenticates its public wallet
+descriptor and random nonce; its 256-bit master key remains in the desktop
+keyring. A `.entwallet` backup uses:
 
 ```text
 KDF       Argon2id v1.3, time=3, memory=64 MiB, threads=2
@@ -348,9 +351,9 @@ semantics. A corrupt or missing vault never causes silent wallet regeneration.
 
 Restoring a wallet replaces the active address and is blocked while mining.
 The ledger remains independent and can be resynchronized after wallet restore.
-The DPAPI vault applies to wallet nodes; seed mode deliberately has no
+Local OS protection applies to wallet nodes; seed mode deliberately has no
 persistent wallet or recovery secret and is therefore portable to supported
-Linux servers.
+servers.
 
 ## Testnet isolation and wallet recovery
 

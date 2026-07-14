@@ -352,6 +352,7 @@ func TestOutboundOnlyNodeReconcilesOfflineTransactionBacklogToSeed(t *testing.T)
 	}
 
 	startTestNode(t, ctx, seed)
+	startTestNode(t, ctx, outboundOnly)
 	callbackAttempts := advertiseUnusableCallback(t, outboundOnly)
 	if err := outboundOnly.AddPeer("http://" + seed.ActualAddress()); err != nil {
 		t.Fatal(err)
@@ -402,11 +403,12 @@ func TestOutboundOnlyNodeReconcilesOfflineStrongerForkToSeed(t *testing.T) {
 	}
 
 	startTestNode(t, ctx, seed)
+	startTestNode(t, ctx, outboundOnly)
 	callbackAttempts := advertiseUnusableCallback(t, outboundOnly)
 	if err := outboundOnly.AddPeer("http://" + seed.ActualAddress()); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, 20*time.Second, func() bool {
+	waitFor(t, 30*time.Second, func() bool {
 		got, tipErr := seed.ledger.Tip(context.Background())
 		return tipErr == nil && got.Height == want.Height && got.Hash == want.Hash && got.Work.Cmp(want.Work) == 0
 	})

@@ -38,14 +38,14 @@ func TestLocalDPAPIRoundTripAndNoPlaintextSecret(t *testing.T) {
 func TestLocalDPAPISupportsMaximumSecretPayload(t *testing.T) {
 	plaintext := bytes.Repeat([]byte{0x5a}, maxSecretBytes)
 	aad := []byte("maximum-payload-test")
-	ciphertext, err := protectLocal(plaintext, aad)
+	ciphertext, err := protectLocal(plaintext, aad, cipherDescriptor{Algorithm: dpapiCipher})
 	if err != nil {
 		t.Fatalf("protect maximum payload: %v", err)
 	}
 	if len(ciphertext) > maxDPAPIBlob {
 		t.Fatalf("DPAPI blob size = %d, maximum = %d", len(ciphertext), maxDPAPIBlob)
 	}
-	opened, err := unprotectLocal(ciphertext, aad)
+	opened, err := unprotectLocal(ciphertext, aad, cipherDescriptor{Algorithm: dpapiCipher})
 	if err != nil {
 		t.Fatalf("unprotect maximum payload: %v", err)
 	}

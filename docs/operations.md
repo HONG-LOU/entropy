@@ -1,9 +1,10 @@
 # Entropy node operations
 
-This guide covers the v1.0.0 Windows desktop node, headless CLI, and optional
-public-seed deployment. The network identity is `entropy-mainnet-v1`, but that
-is a compatibility label rather than an audit or production-safety claim. ENT
-must not carry real-world value without appropriate independent audits.
+This guide covers the v1.0.1 Windows/Ubuntu desktop node, headless CLI, and
+optional public-seed deployment. The network identity is
+`entropy-mainnet-v1`, but that is a compatibility label rather than an audit or
+production-safety claim. ENT must not carry real-world value without
+appropriate independent audits.
 
 ## Install and launch
 
@@ -14,10 +15,18 @@ Release builds provide these Windows artifacts:
 - `entropy-cli.exe`: headless node and wallet utility;
 - `entropy-windows-seed-deploy.zip`: archive-seed deployment package.
 
-Verify the artifact against `SHA256SUMS.txt` from the same release before
-running it. Current binaries are not Authenticode-signed, so a checksum proves
-only that the file matches the published release artifact, not that a trusted
-certificate authority verified its publisher.
+Ubuntu 24.04+ amd64 releases additionally provide:
+
+- `entropy_1.0.1_amd64.deb`: desktop application and CLI installer;
+- `entropy-linux-amd64`: unpackaged desktop binary;
+- `entropy-cli-linux-amd64`: unpackaged headless node;
+- `SHA256SUMS-linux.txt`: Linux artifact checksums.
+
+Verify Windows artifacts against `SHA256SUMS.txt` and Linux artifacts against
+`SHA256SUMS-linux.txt` from the same release before running them. Current
+binaries are not code-signed, so a checksum proves only that the file matches
+the published release artifact, not that a trusted certificate authority
+verified its publisher.
 
 Double-click the installed shortcut or portable EXE. A clean first launch
 creates the wallet and SQLite ledger under
@@ -39,6 +48,12 @@ strict `--listen` behavior so operator mistakes fail visibly.
 Microsoft WebView2 Runtime is required. It is normally present on current
 Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 
+Install Ubuntu packages with `sudo apt install ./entropy_1.0.1_amd64.deb`, then
+launch **Entropy** from the desktop menu or run `entropy`. Ubuntu stores mainnet
+state under `~/.config/Entropy/mainnet-v1`. The logged-in desktop session must
+provide an unlocked Secret Service keyring; the standard Ubuntu Desktop session
+does so automatically.
+
 ## Uninstall and retained data
 
 The NSIS uninstaller removes the installed application and shortcuts. It does
@@ -46,6 +61,10 @@ not delete `%LOCALAPPDATA%\Entropy\mainnet-v1`; wallet keys, the recovery
 marker, peer records, and the chain database remain available for a later
 reinstall. Remove active data manually only after confirming that the recovery
 phrase or a portable `.entwallet` backup works.
+
+On Ubuntu, `sudo apt remove entropy` removes the application and menu entry but
+retains `~/.config/Entropy/mainnet-v1` and the Secret Service key. Confirm the
+recovery phrase or portable backup before deleting either one.
 
 Do not configure profile replication for the live mainnet directory. Copying
 SQLite WAL files between computers is not a supported backup method.
@@ -278,7 +297,7 @@ Remove-Item Env:\ENTROPY_WALLET_PASSWORD
 ```
 
 The migration preserves the old P-256 key and address but does not migrate its
-testnet chain. There is intentionally no CLI restore command in v1.0.0; start
+testnet chain. There is intentionally no CLI restore command in v1.0.1; start
 the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
@@ -290,7 +309,7 @@ The default Windows layout is:
   entropy.db                       SQLite ledger and indexes
   entropy.db-wal                   live WAL, normally checkpointed on shutdown
   entropy.db-shm                   live SQLite shared-memory file
-  wallet.vault                     DPAPI-protected active wallet
+  wallet.vault                     OS-user-protected active wallet
   wallet.recovery-confirmed        local backup acknowledgement marker
   node.lock                        exclusive process lock
 ```
@@ -312,7 +331,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v1.0.0 wallet
+### New v1.0.1 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -324,12 +343,17 @@ while the node is live can omit committed data still present in its WAL.
 The BIP39 words use an Entropy-specific P-256 derivation and an empty BIP39
 passphrase. Generic Bitcoin or Ethereum wallets will not derive this address.
 
-### Local DPAPI vault
+### Local operating-system vault
 
 `wallet.vault` unlocks automatically through Windows user-scope DPAPI. It is
 bound to the Windows protection context and is not a portable recovery method.
 Changing computers, reinstalling Windows, deleting the Windows profile, or
 losing account protection may make the copied local vault unusable.
+
+On Ubuntu, `wallet.vault` is authenticated with XChaCha20-Poly1305 and its
+random master key is held by Secret Service for the current Linux user. The
+vault file and keyring entry are both required. Losing either one, resetting the
+login keyring, or copying only the file makes the local vault unusable.
 
 ### Portable `.entwallet` backup
 
@@ -346,8 +370,8 @@ reset by the project.
 4. Verify the displayed address against your known address.
 5. Allow the existing ledger to refresh history and balances.
 
-Restore atomically replaces the active DPAPI vault. It does not merge two
-wallets and does not delete the chain database.
+Restore atomically replaces the active operating-system vault. It does not
+merge two wallets and does not delete the chain database.
 
 ### Restore from 24 words
 
@@ -371,9 +395,9 @@ it.
 For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
 `.entwallet` backup. For a v0.1 plaintext wallet, run `wallet-migrate` against a
 copy of the old directory; the command validates the key and creates verified
-DPAPI and portable encrypted copies before removing plaintext from that copy.
+local OS protection and portable encrypted copies before removing plaintext.
 
-Then start v1.0.0 normally and restore the phrase or `.entwallet` from the
+Then start v1.0.1 normally and restore the phrase or `.entwallet` from the
 desktop Wallet view. This recovers only the P-256 key and address. Mainnet
 balances, spendable outputs, confirmations, and history are derived solely from
 the mainnet chain and begin independently of every testnet balance.
@@ -481,10 +505,15 @@ disable Wi-Fi client isolation. Otherwise add peers manually. Use
 Install or repair Microsoft WebView2 Runtime. The node backend treats startup
 failures as fatal and does not show fake balances or simulated success.
 
+On Ubuntu, verify `libwebkit2gtk-4.1-0` is installed and that the graphical
+login session exposes `DBUS_SESSION_BUS_ADDRESS`. A Secret Service error means
+the login keyring is absent or locked; unlock it rather than deleting
+`wallet.vault`.
+
 ## Operational security boundary
 
 Opening TCP `47821` exposes a deliberately public P2P parser to untrusted input.
 The implementation applies message, connection, and timeout limits, but has not
-been independently audited. Keep Windows patched, run as a normal user, keep
-wallet backups offline, do not assign real-world value to ENT, and read
-[the security policy](../SECURITY.md).
+been independently audited. Keep the operating system patched, run as a normal
+user, keep wallet backups offline, do not assign real-world value to ENT, and
+read [the security policy](../SECURITY.md).

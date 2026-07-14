@@ -8,14 +8,17 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wailsapp/wails/v2 v2.13.0
+	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.51.0
 	golang.org/x/sys v0.44.0
 	modernc.org/sqlite v1.53.0
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

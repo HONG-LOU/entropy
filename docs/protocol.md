@@ -1,6 +1,6 @@
 # Entropy mainnet protocol
 
-This document describes the v1.0.0 implementation. The consensus/network
+This document describes the v1.0.1 implementation. The consensus/network
 identity is `entropy-mainnet-v1`. The HTTP path prefix remains `/v2` because it
 denotes the second transport design; endpoint numbering and network identity
 are not the same version counter.
@@ -241,7 +241,7 @@ Supported message types are:
 | `reconcile_error` | request ID and bounded error | fail one request without accepting partial state |
 
 Reconcile messages are capability-gated for compatibility. After `hello`, a
-v1.0.0 peer sends an ordinary `ping` whose existing `node_id` field contains
+A v1 peer sends an ordinary `ping` whose existing `node_id` field contains
 `entropy-reconcile-v1`. A supporting peer echoes that marker in `pong`. Older
 implementations accept the known `ping` fields and return an unmarked `pong`, so
 the new node continues using HTTP and live gossip and never sends them an

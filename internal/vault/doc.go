@@ -9,7 +9,8 @@
 // Entropy-specific derivation, not BIP32 or SLIP-0010; the constant and test
 // vector form part of the recovery contract.
 //
-// Local vaults use Windows user-scope DPAPI and open without an application
-// password for the same Windows account. Portable .entwallet backups use
-// Argon2id and XChaCha20-Poly1305 and can be opened cross-platform.
+// Local vaults use Windows user-scope DPAPI or Linux Secret Service with
+// XChaCha20-Poly1305 and open without an application password for the same OS
+// account. Portable .entwallet backups use Argon2id and XChaCha20-Poly1305 and
+// can be opened cross-platform.
 package vault

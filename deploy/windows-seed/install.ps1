@@ -89,7 +89,7 @@ foreach ($path in @($EntropyCliPath, $CaddyPath)) {
     }
 }
 if ($null -eq $NodeCredential) {
-    $NodeCredential = Get-Credential -Message "Windows account that will own the DPAPI-protected Entropy seed wallet"
+    $NodeCredential = Get-Credential -Message "Dedicated Windows account for the walletless Entropy seed service"
 }
 $nodeAccount = $NodeCredential.UserName
 try {
@@ -181,7 +181,7 @@ try {
         -User $nodeAccount `
         -Password $plainPassword `
         -RunLevel Limited `
-        -Description "Entropy archive seed node under its DPAPI wallet account" `
+        -Description "Entropy walletless archive seed node under its dedicated service account" `
         -Force | Out-Null
     $plainPassword = $null
     $registeredTasks += $nodeTaskName

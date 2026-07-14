@@ -1,10 +1,10 @@
 # Entropy (ENT)
 
-Entropy v1.0.0 is a compact proof-of-work mainnet packaged as a Windows desktop
-full node. Starting one application starts the wallet, SQLite ledger, full block
-and transaction validation, peer synchronization, relay server, and optional
-miner in the same process. It does not require a separate database server,
-browser tab, or background daemon.
+Entropy v1.0.1 is a compact proof-of-work mainnet packaged as a Windows and
+Ubuntu desktop full node. Starting one application starts the wallet, SQLite
+ledger, full block and transaction validation, peer synchronization, relay
+server, and optional miner in the same process. It does not require a separate
+database server, browser tab, or background daemon.
 
 > `entropy-mainnet-v1` is a genesis and consensus compatibility identifier, not
 > an audit or production-security claim. Entropy has not received an independent
@@ -15,7 +15,7 @@ browser tab, or background daemon.
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entropy>.
 
-## What v1.0.0 includes
+## What v1.0.1 includes
 
 - A Wails desktop node with send, receive, mining, peer, history, wallet
   recovery, database, and pruning controls.
@@ -29,9 +29,9 @@ The source repository is public and MIT-licensed:
   broadcast as a fallback delivery path and bounded reconnect catch-up.
 - Automatic LAN discovery plus persistent manual peers, connection limits,
   and exponential retry backoff.
-- A Windows DPAPI-protected local wallet, 24-word BIP39 recovery for newly
-  created wallets, and portable Argon2id/XChaCha20-Poly1305 `.entwallet`
-  backups.
+- A Windows DPAPI-protected or Linux Secret Service-protected local wallet,
+  24-word BIP39 recovery for newly created wallets, and portable
+  Argon2id/XChaCha20-Poly1305 `.entwallet` backups.
 - Archive and pruned storage modes. Both validate incoming blocks locally;
   archive nodes additionally keep and serve all historical bodies.
 - Built-in HTTPS bootstrap manifests with bounded validation and independent
@@ -43,8 +43,8 @@ The source repository is public and MIT-licensed:
 - An explicit archive-only `--seed-mode` for Linux or Windows public relays. It
   creates no wallet file, uses a new ephemeral identity after each restart,
   and disables sending, mining, recovery, backup, and restore operations.
-- A portable desktop executable, NSIS per-user installer, headless CLI, and an
-  optional Windows archive-seed deployment package.
+- Windows portable/NSIS artifacts, an Ubuntu 24.04+ `.deb`, native headless
+  CLIs, and an optional Windows archive-seed deployment package.
 
 ## How many nodes are required?
 
@@ -62,9 +62,8 @@ NAT node simply cannot accept unsolicited inbound connections.
 
 ## Run the Windows desktop node
 
-Until a v1 public seed is deployed and the v1 release is published, use the
-portable executable or installer produced from this mainnet source tree. Do not
-use the older v0.2 release assets for `entropy-mainnet-v1`. The portable build is
+Use the portable executable or installer from the current release. Do not use
+the older v0.2 release assets for `entropy-mainnet-v1`. The portable build is
 produced locally at:
 
 ```text
@@ -113,6 +112,27 @@ chain database can be downloaded again; the wallet cannot.
 
 See [Operations](docs/operations.md) for multi-node examples, firewall and NAT
 setup, backups, migration, pruning, and troubleshooting.
+
+## Run the Ubuntu desktop node
+
+Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
+
+```bash
+sudo apt install ./entropy_1.0.1_amd64.deb
+entropy
+```
+
+The package installs a normal desktop-menu entry plus `entropy-cli`. The wallet
+master key is stored in the logged-in user's Secret Service keyring and the
+authenticated ciphertext remains at
+`~/.config/Entropy/mainnet-v1/wallet.vault`. A standard Ubuntu Desktop login
+starts and unlocks this service. A locked, missing, or inaccessible keyring
+causes startup to fail closed instead of creating a replacement wallet.
+
+Windows DPAPI and Linux Secret Service vault files are intentionally not
+portable. Move the same address between systems by restoring its 24-word
+Entropy phrase or verified `.entwallet` backup. Consensus, addresses, balances,
+mining, and peer synchronization are identical on both platforms.
 
 ## Transfer and confirmation speed
 
@@ -257,7 +277,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.0 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.0.1 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -268,9 +288,10 @@ portable encrypted backup is essential.
 
 ## Build and verify
 
-Prerequisites: Go 1.26.5, Node.js 22+, Wails v2.13.0, WebView2, and NSIS for
-the installer. The patch-level Go pin includes standard-library security fixes
-used by the public network stack.
+Prerequisites: Go 1.26.5, Node.js 22+, and Wails v2.13.0. Windows packaging
+also needs WebView2 and NSIS. Ubuntu 24.04 packaging needs `libgtk-3-dev`,
+`libwebkit2gtk-4.1-dev`, and `dpkg-deb`. The patch-level Go pin includes
+standard-library security fixes used by the public network stack.
 
 ```powershell
 cd D:\Entropy
@@ -289,6 +310,12 @@ Create the portable EXE, NSIS installer, CLI, public-seed deployment ZIP, and
 
 The build script runs Go tests and vet first. Current release artifacts are not
 Authenticode-signed and builds are not yet reproducible.
+
+On Ubuntu 24.04:
+
+```bash
+./scripts/build-linux.sh 1.0.1
+```
 
 ## Documentation
 
