@@ -1,6 +1,6 @@
 # Entropy (ENT)
 
-Entropy v1.0.1 is a compact proof-of-work mainnet packaged as a Windows and
+Entropy v1.0.2 is a compact proof-of-work mainnet packaged as a Windows and
 Ubuntu desktop full node. Starting one application starts the wallet, SQLite
 ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
@@ -15,7 +15,7 @@ database server, browser tab, or background daemon.
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entropy>.
 
-## What v1.0.1 includes
+## What v1.0.2 includes
 
 - A Wails desktop node with send, receive, mining, peer, history, wallet
   recovery, database, and pruning controls.
@@ -29,9 +29,10 @@ The source repository is public and MIT-licensed:
   broadcast as a fallback delivery path and bounded reconnect catch-up.
 - Automatic LAN discovery plus persistent manual peers, connection limits,
   and exponential retry backoff.
-- A Windows DPAPI-protected or Linux Secret Service-protected local wallet,
-  24-word BIP39 recovery for newly created wallets, and portable
-  Argon2id/XChaCha20-Poly1305 `.entwallet` backups.
+- Windows DPAPI-protected or Linux Secret Service-protected local wallet
+  profiles, with create/import/switch/guarded removal over one chain database,
+  24-word BIP39 recovery, and portable Argon2id/XChaCha20-Poly1305
+  `.entwallet` backups.
 - Archive and pruned storage modes. Both validate incoming blocks locally;
   archive nodes additionally keep and serve all historical bodies.
 - Built-in HTTPS bootstrap manifests with bounded validation and independent
@@ -110,6 +111,14 @@ The wallet screen will ask you to record the 24-word phrase or export an
 encrypted `.entwallet` backup. Do that before mining or receiving funds. The
 chain database can be downloaded again; the wallet cannot.
 
+The Wallet view can keep multiple local wallets. Creating or importing another
+wallet preserves the current profile and activates the selected one without
+duplicating or resynchronizing the chain database. A wallet cannot be switched
+away from until its recovery is confirmed, and an active or unsecured wallet
+cannot be removed. Entropy has no hosted wallet account or server login;
+restoring a phrase or `.entwallet` is how the same wallet is opened on another
+computer.
+
 See [Operations](docs/operations.md) for multi-node examples, firewall and NAT
 setup, backups, migration, pruning, and troubleshooting.
 
@@ -118,7 +127,7 @@ setup, backups, migration, pruning, and troubleshooting.
 Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
 
 ```bash
-sudo apt install ./entropy_1.0.1_amd64.deb
+sudo apt install ./entropy_1.0.2_amd64.deb
 entropy
 ```
 
@@ -246,9 +255,11 @@ The release includes `entropy-windows-seed-deploy.zip`; see
 [Public seed deployment](docs/public-seed.md). The seed package runs an archive
 node behind a Caddy HTTPS/WSS reverse proxy on TCP 443. Direct desktop P2P is
 plain HTTP/WebSocket, has no peer authentication, and does not automatically
-traverse NAT. NAT traversal is unnecessary for a client node to reconcile over
-an outbound connection, but at least one reachable peer is still required for
-initial discovery and network-wide connectivity.
+traverse NAT. Inbound WebSocket source addresses are not advertised as dialable
+peers unless a separate outbound URL has already been verified. NAT traversal
+is unnecessary for a client node to reconcile over an outbound connection, but
+at least one reachable peer is still required for initial discovery and
+network-wide connectivity.
 
 ## Storage modes
 
@@ -277,7 +288,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.1 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.0.2 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -314,13 +325,14 @@ Authenticode-signed and builds are not yet reproducible.
 On Ubuntu 24.04:
 
 ```bash
-./scripts/build-linux.sh 1.0.1
+./scripts/build-linux.sh 1.0.2
 ```
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Node operations and wallet recovery](docs/operations.md)
+- [Lightweight mainnet maturity roadmap](docs/maturity-roadmap.md)
 - [Mainnet protocol](docs/protocol.md)
 - [Public seed deployment](docs/public-seed.md)
 - [Roadmap](docs/roadmap.md)

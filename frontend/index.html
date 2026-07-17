@@ -201,7 +201,10 @@
         <section class="view" id="view-wallet" data-view-panel="wallet" hidden>
           <div class="view-heading">
             <div><p class="eyebrow">Local identity</p><h1>Wallet security</h1></div>
-            <span class="security-state" id="wallet-security-state"><i data-lucide="shield-check"></i><span>Checking</span></span>
+            <div class="wallet-heading-actions">
+              <span class="security-state" id="wallet-security-state"><i data-lucide="shield-check"></i><span>Checking</span></span>
+              <button class="icon-button solid" id="open-create-wallet" type="button" title="Create wallet" aria-label="Create wallet"><i data-lucide="plus"></i></button>
+            </div>
           </div>
           <section class="wallet-identity">
             <div>
@@ -209,6 +212,13 @@
               <code id="wallet-page-address">--</code>
             </div>
             <button class="icon-button outlined" id="copy-wallet-page-address" type="button" title="Copy address" aria-label="Copy address"><i data-lucide="copy"></i></button>
+          </section>
+          <section class="surface wallet-profiles" aria-labelledby="wallet-profiles-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow">On this device</p><h2 id="wallet-profiles-heading">Wallets</h2></div>
+              <span class="count-badge" id="wallet-count">0</span>
+            </div>
+            <ul class="wallet-profile-list" id="wallet-profile-list"><li class="empty-row">Loading wallets</li></ul>
           </section>
           <section class="surface wallet-actions" aria-label="Wallet actions">
             <div class="wallet-action-row">
@@ -223,13 +233,13 @@
             </div>
             <div class="wallet-action-row">
               <span class="action-icon amber"><i data-lucide="upload"></i></span>
-              <div><strong>Restore encrypted backup</strong><span>Replace the active wallet from a backup file</span></div>
-              <button class="secondary-button" id="open-restore-backup" type="button"><i data-lucide="rotate-ccw"></i><span>Restore</span></button>
+              <div><strong>Add encrypted backup</strong><span>Keep existing wallets and activate the imported wallet</span></div>
+              <button class="secondary-button" id="open-restore-backup" type="button"><i data-lucide="upload"></i><span>Import</span></button>
             </div>
             <div class="wallet-action-row">
               <span class="action-icon amber"><i data-lucide="file-key"></i></span>
-              <div><strong>Restore recovery phrase</strong><span>Replace the active wallet from 24 words</span></div>
-              <button class="secondary-button" id="open-restore-phrase" type="button"><i data-lucide="rotate-ccw"></i><span>Restore</span></button>
+              <div><strong>Add recovery phrase</strong><span>Keep existing wallets and activate the restored wallet</span></div>
+              <button class="secondary-button" id="open-restore-phrase" type="button"><i data-lucide="file-key"></i><span>Import</span></button>
             </div>
           </section>
         </section>
@@ -347,31 +357,56 @@
       <dialog class="modal" id="restore-backup-dialog" aria-labelledby="restore-backup-title">
         <form class="modal-shell" id="restore-backup-form">
           <header class="modal-heading">
-            <div><span class="modal-icon amber"><i data-lucide="upload"></i></span><div><p class="eyebrow">Replace wallet</p><h2 id="restore-backup-title">Restore encrypted backup</h2></div></div>
+            <div><span class="modal-icon amber"><i data-lucide="upload"></i></span><div><p class="eyebrow">Add wallet</p><h2 id="restore-backup-title">Import encrypted backup</h2></div></div>
             <button class="icon-button" type="button" data-close-dialog="restore-backup-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
           </header>
-          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>Stop mining first. A successful restore immediately replaces the active wallet.</span></div>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>The imported wallet becomes active. Existing wallets remain on this device.</span></div>
           <label for="restore-backup-password">Backup password</label>
           <input id="restore-backup-password" type="password" autocomplete="off" maxlength="1024" required />
           <div class="password-status"><span>12-1024 UTF-8 bytes</span><strong id="restore-password-bytes">0 bytes</strong></div>
-          <label class="check-control destructive-check"><input id="restore-backup-check" type="checkbox" required /><span>Replace the active wallet</span></label>
-          <button class="danger-button full-button" type="submit"><i data-lucide="rotate-ccw"></i><span>Choose backup and restore</span></button>
+          <label class="check-control"><input id="restore-backup-check" type="checkbox" required /><span>Add and activate this wallet</span></label>
+          <button class="primary-button full-button" type="submit"><i data-lucide="upload"></i><span>Choose backup and import</span></button>
         </form>
       </dialog>
 
       <dialog class="modal" id="restore-phrase-dialog" aria-labelledby="restore-phrase-title">
         <form class="modal-shell" id="restore-phrase-form">
           <header class="modal-heading">
-            <div><span class="modal-icon amber"><i data-lucide="file-key"></i></span><div><p class="eyebrow">Replace wallet</p><h2 id="restore-phrase-title">Restore recovery phrase</h2></div></div>
+            <div><span class="modal-icon amber"><i data-lucide="file-key"></i></span><div><p class="eyebrow">Add wallet</p><h2 id="restore-phrase-title">Import recovery phrase</h2></div></div>
             <button class="icon-button" type="button" data-close-dialog="restore-phrase-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
           </header>
-          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>Stop mining first. Enter the complete 24-word phrase.</span></div>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>Enter all 24 words. Existing wallets remain on this device.</span></div>
           <label for="restore-phrase">Recovery phrase</label>
           <textarea id="restore-phrase" rows="5" autocomplete="off" autocapitalize="none" spellcheck="false" required></textarea>
           <div class="password-status"><span>Expected phrase length</span><strong id="restore-word-count">0 / 24 words</strong></div>
-          <label class="check-control destructive-check"><input id="restore-phrase-check" type="checkbox" required /><span>Replace the active wallet</span></label>
-          <button class="danger-button full-button" type="submit"><i data-lucide="rotate-ccw"></i><span>Restore wallet</span></button>
+          <label class="check-control"><input id="restore-phrase-check" type="checkbox" required /><span>Add and activate this wallet</span></label>
+          <button class="primary-button full-button" type="submit"><i data-lucide="file-key"></i><span>Import wallet</span></button>
         </form>
+      </dialog>
+
+      <dialog class="modal" id="create-wallet-dialog" aria-labelledby="create-wallet-title">
+        <div class="modal-shell">
+          <header class="modal-heading">
+            <div><span class="modal-icon green"><i data-lucide="plus"></i></span><div><p class="eyebrow">New identity</p><h2 id="create-wallet-title">Create wallet</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="create-wallet-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice warning"><i data-lucide="triangle-alert"></i><span>A new wallet becomes active. The current wallet remains available on this device.</span></div>
+          <label class="check-control"><input id="create-wallet-check" type="checkbox" /><span>Create and activate a new wallet</span></label>
+          <button class="primary-button full-button" id="confirm-create-wallet" type="button" disabled><i data-lucide="plus"></i><span>Create wallet</span></button>
+        </div>
+      </dialog>
+
+      <dialog class="modal" id="remove-wallet-dialog" aria-labelledby="remove-wallet-title">
+        <div class="modal-shell">
+          <header class="modal-heading">
+            <div><span class="modal-icon amber"><i data-lucide="trash-2"></i></span><div><p class="eyebrow">Device storage</p><h2 id="remove-wallet-title">Remove wallet</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="remove-wallet-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="security-notice"><i data-lucide="triangle-alert"></i><span>Removal deletes this wallet vault from this device. Recovery requires its 24 words or encrypted backup.</span></div>
+          <code class="remove-wallet-address" id="remove-wallet-address">--</code>
+          <label class="check-control destructive-check"><input id="remove-wallet-check" type="checkbox" /><span>I can recover this wallet</span></label>
+          <button class="danger-button full-button" id="confirm-remove-wallet" type="button" disabled><i data-lucide="trash-2"></i><span>Remove from device</span></button>
+        </div>
       </dialog>
 
       <dialog class="modal" id="prune-dialog" aria-labelledby="prune-confirm-title">

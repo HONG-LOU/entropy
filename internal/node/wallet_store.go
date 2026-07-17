@@ -25,7 +25,7 @@ type walletLoadState struct {
 }
 
 func loadSeedMaterial(storage *store.Store) (*vault.Material, walletLoadState, error) {
-	for _, name := range []string{walletVaultName, walletRecoveryMarker, "wallet.json"} {
+	for _, name := range []string{walletVaultName, walletRecoveryMarker, walletProfilesDirectory, "wallet.json"} {
 		_, err := os.Lstat(filepath.Join(storage.Directory(), name))
 		if err == nil {
 			return nil, walletLoadState{}, fmt.Errorf("seed mode refuses persistent wallet artifact %s", name)
@@ -58,6 +58,10 @@ func loadWalletMaterial(storage *store.Store, existingNodeData bool) (*vault.Mat
 			clearWalletMaterial(material)
 			return nil, walletLoadState{LegacyNeedsBackup: true}, ErrLegacyWalletMigrationRequired
 		}
+		if err := ensureWalletProfile(storage, material); err != nil {
+			clearWalletMaterial(material)
+			return nil, walletLoadState{}, err
+		}
 		return material, walletLoadState{}, nil
 	}
 	if !errors.Is(err, vault.ErrNotFound) {
@@ -84,6 +88,10 @@ func loadWalletMaterial(storage *store.Store, existingNodeData bool) (*vault.Mat
 	if err := vault.CreateLocal(vaultPath, material); err != nil {
 		clearWalletMaterial(material)
 		return nil, walletLoadState{}, fmt.Errorf("create protected wallet: %w", err)
+	}
+	if err := ensureWalletProfile(storage, material); err != nil {
+		clearWalletMaterial(material)
+		return nil, walletLoadState{}, err
 	}
 	return material, walletLoadState{Created: true}, nil
 }
@@ -153,7 +161,18 @@ func clearWalletMaterial(material *vault.Material) {
 }
 
 func walletRecoveryConfirmed(storage *store.Store, address string) bool {
-	path := filepath.Join(storage.Directory(), walletRecoveryMarker)
+	return profileWalletRecoveryConfirmed(storage, address) || legacyWalletRecoveryConfirmed(storage, address)
+}
+
+func profileWalletRecoveryConfirmed(storage *store.Store, address string) bool {
+	return walletRecoveryMarkerMatches(walletProfileMarkerPath(storage, address), address)
+}
+
+func legacyWalletRecoveryConfirmed(storage *store.Store, address string) bool {
+	return walletRecoveryMarkerMatches(filepath.Join(storage.Directory(), walletRecoveryMarker), address)
+}
+
+func walletRecoveryMarkerMatches(path, address string) bool {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 128 {
 		return false
@@ -169,7 +188,16 @@ func markWalletRecoveryConfirmed(storage *store.Store, address string) error {
 	if err := core.ValidateAddress(address); err != nil {
 		return fmt.Errorf("record wallet recovery confirmation: %w", err)
 	}
-	path := filepath.Join(storage.Directory(), walletRecoveryMarker)
+	if _, err := ensureWalletProfilesDirectory(storage); err != nil {
+		return err
+	}
+	if err := writeWalletRecoveryMarker(walletProfileMarkerPath(storage, address), address); err != nil {
+		return err
+	}
+	return writeWalletRecoveryMarker(filepath.Join(storage.Directory(), walletRecoveryMarker), address)
+}
+
+func writeWalletRecoveryMarker(path, address string) error {
 	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
 		return fmt.Errorf("wallet recovery marker is not a regular file")
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {

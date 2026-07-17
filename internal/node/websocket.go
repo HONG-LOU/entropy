@@ -1134,16 +1134,6 @@ func (s *Service) handleGossip(ctx context.Context, socket *peerSocket, message 
 			}
 			socket.noteRemoteStatus(*message.Status)
 		}
-		if socket.baseURL == "" && message.ListenPort > 0 {
-			host := socket.remoteIP
-			if host != "" {
-				base := "http://" + net.JoinHostPort(host, strconv.Itoa(message.ListenPort))
-				if normalized, err := normalizePeer(base); err == nil {
-					socket.baseURL = normalized
-					s.addDiscoveredPeer(normalized)
-				}
-			}
-		}
 		if message.Status != nil && socket.baseURL != "" {
 			s.markPeerSuccess(socket.baseURL, message.Status.Height)
 		}

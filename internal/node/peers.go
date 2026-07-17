@@ -21,7 +21,29 @@ const (
 	defaultMaxOutboundPeers  = 8
 	defaultPeerSyncInterval  = 15 * time.Second
 	peerSchedulerInterval    = time.Second
+	staleDiscoveredFailures  = 8
 )
+
+func (s *Service) removeStaleDiscoveredPeers(ctx context.Context) error {
+	s.mu.Lock()
+	stale := make([]string, 0)
+	for peer, state := range s.peers {
+		if state.Discovered && !state.Bootstrap && state.LastSeen.IsZero() && state.Failures >= staleDiscoveredFailures {
+			stale = append(stale, peer)
+			delete(s.peers, peer)
+			delete(s.activeOutbound, peer)
+			delete(s.mempoolOffsets, peer)
+			delete(s.peerExchangeNext, peer)
+		}
+	}
+	s.mu.Unlock()
+	for _, peer := range stale {
+		if err := s.ledger.RemovePeer(ctx, peer); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 type peerState struct {
 	URL                string

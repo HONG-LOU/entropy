@@ -433,7 +433,6 @@ func TestWebSocketInvalidGossipThresholdDisconnectsAndBacksOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	peerURL := "http://127.0.0.1:49000"
 	if err := connection.WriteJSON(gossipMessage{
 		Type: "hello", Protocol: ledger.ProtocolName, NodeID: remoteWallet.Address, ListenPort: 49000,
 	}); err != nil {
@@ -473,9 +472,15 @@ func TestWebSocketInvalidGossipThresholdDisconnectsAndBacksOff(t *testing.T) {
 	waitFor(t, 3*time.Second, func() bool {
 		service.mu.RLock()
 		defer service.mu.RUnlock()
-		state := service.peers[peerURL]
-		return state != nil && state.Failures > 0 && !state.NextAttempt.IsZero()
+		state := service.invalidGossipByIP["127.0.0.1"]
+		return state != nil && state.score >= webSocketInvalidScoreLimit
 	})
+	service.mu.RLock()
+	peerCount := len(service.peers)
+	service.mu.RUnlock()
+	if peerCount != 0 {
+		t.Fatalf("inbound WebSocket polluted outbound peer table with %d entries", peerCount)
+	}
 	_ = connection.SetReadDeadline(time.Now().Add(2 * time.Second))
 	for {
 		if _, _, err := connection.ReadMessage(); err != nil {

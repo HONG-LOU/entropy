@@ -307,11 +307,27 @@ td code { color: var(--green); }
 .health-label { color: var(--blue); background: var(--blue-soft); }
 .health-label.error { color: var(--red); background: var(--red-soft); }
 .security-state svg, .health-label svg { width: 13px; height: 13px; }
+.wallet-heading-actions { display: flex; align-items: center; gap: 8px; }
 .wallet-identity { min-width: 0; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .wallet-identity > div { min-width: 0; }
 .wallet-identity span, .wallet-identity code { display: block; }
 .wallet-identity span { margin-bottom: 4px; color: var(--muted); font-size: 10px; }
 .wallet-identity code { overflow: hidden; color: #3e4743; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-profiles { margin-bottom: 16px; padding-top: 14px; padding-bottom: 8px; }
+.wallet-profile-list { max-height: 330px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.wallet-profile-list li { min-height: 58px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 8px 2px; border-bottom: 1px solid var(--soft-line); }
+.wallet-profile-list li:last-child { border-bottom: 0; }
+.wallet-profile-list li.active { background: #f7faf8; }
+.wallet-profile-list .empty-row { display: flex; justify-content: center; color: var(--muted); font-size: 11px; }
+.wallet-profile-mark { width: 32px; height: 32px; display: grid; place-items: center; color: var(--green); background: var(--green-soft); border-radius: 5px; }
+.wallet-profile-mark svg { width: 16px; height: 16px; }
+.wallet-profile-main { min-width: 0; }
+.wallet-profile-main code, .wallet-profile-main span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-profile-main code { color: #3f4944; font-size: 10px; }
+.wallet-profile-main span { margin-top: 3px; color: var(--muted); font-size: 9px; }
+.wallet-profile-actions { display: flex; align-items: center; gap: 5px; }
+.remove-wallet { color: #8d5147; }
+.remove-wallet-address { display: block; padding: 10px; overflow-wrap: anywhere; color: #3f4944; background: #f6f7f5; border: 1px solid var(--line); font-size: 10px; }
 .wallet-actions { padding-top: 4px; padding-bottom: 4px; }
 .wallet-action-row { min-height: 70px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 10px 0; border-bottom: 1px solid var(--soft-line); }
 .wallet-action-row:last-child { border-bottom: 0; }
@@ -461,6 +477,8 @@ dialog.modal[open] { display: grid; place-items: center; }
   .button-row { align-items: stretch; flex-direction: column; }
   .wallet-action-row { grid-template-columns: auto minmax(0, 1fr); }
   .wallet-action-row > button { grid-column: 1 / -1; width: 100%; }
+  .wallet-profile-list li { grid-template-columns: auto minmax(0, 1fr); }
+  .wallet-profile-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .recovery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prune-buttons { align-items: stretch; flex-direction: column; }
   .startup-overlay { padding: 8px; }

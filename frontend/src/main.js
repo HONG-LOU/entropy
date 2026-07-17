@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowDownLeft,
+  ArrowRightLeft,
   ArrowUpRight,
   CircleAlert,
   CircleCheck,
@@ -33,6 +34,7 @@ import {
   Upload,
   Wifi,
   WifiOff,
+  WalletCards,
   X,
   createIcons,
 } from "lucide";
@@ -41,6 +43,7 @@ import "./style.css";
 const appIcons = {
   Activity,
   ArrowDownLeft,
+  ArrowRightLeft,
   ArrowUpRight,
   CircleAlert,
   CircleCheck,
@@ -73,6 +76,7 @@ const appIcons = {
   Upload,
   Wifi,
   WifiOff,
+  WalletCards,
   X,
 };
 
@@ -86,6 +90,7 @@ const state = {
   historyRefreshing: false,
   recoveryPhrase: "",
   pendingPruneRetain: 0,
+  pendingRemoveWallet: "",
   lastDashboardError: "",
   lastHistoryRefresh: 0,
 };
@@ -320,6 +325,72 @@ function renderPeers(peers) {
   }
 }
 
+function renderWalletProfiles(profiles, mining) {
+  const list = $("wallet-profile-list");
+  list.replaceChildren();
+  setText("wallet-count", profiles.length.toLocaleString());
+  if (profiles.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty-row";
+    empty.textContent = "No wallet profiles available";
+    list.append(empty);
+    return;
+  }
+
+  for (const profile of profiles) {
+    const row = document.createElement("li");
+    row.classList.toggle("active", Boolean(profile.active));
+    const mark = document.createElement("span");
+    mark.className = "wallet-profile-mark";
+    mark.append(icon(profile.active ? "wallet-cards" : "key-round"));
+
+    const main = document.createElement("div");
+    main.className = "wallet-profile-main";
+    const address = document.createElement("code");
+    address.textContent = String(profile.address || "Unknown wallet");
+    address.title = String(profile.address || "");
+    const status = document.createElement("span");
+    status.textContent = profile.active ? "Active wallet" : profile.needs_backup ? "Backup needed" : "Ready to activate";
+    main.append(address, status);
+
+    const actions = document.createElement("div");
+    actions.className = "wallet-profile-actions";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "icon-button";
+    copy.title = "Copy wallet address";
+    copy.setAttribute("aria-label", "Copy wallet address");
+    copy.append(icon("copy"));
+    copy.addEventListener("click", () => copyText(String(profile.address || ""), "Address copied"));
+    actions.append(copy);
+
+    if (!profile.active) {
+      const activate = document.createElement("button");
+      activate.type = "button";
+      activate.className = "icon-button outlined";
+      activate.title = mining ? "Stop mining before switching wallets" : "Activate wallet";
+      activate.setAttribute("aria-label", "Activate wallet");
+      activate.disabled = mining;
+      activate.append(icon("arrow-right-left"));
+      activate.addEventListener("click", () => switchWallet(String(profile.address || ""), activate));
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "icon-button remove-wallet";
+      remove.title = profile.needs_backup ? "Secure this wallet before removing it" : "Remove wallet from device";
+      remove.setAttribute("aria-label", "Remove wallet from device");
+      remove.disabled = Boolean(profile.needs_backup);
+      remove.append(icon("trash-2"));
+      remove.addEventListener("click", () => openRemoveWallet(String(profile.address || "")));
+      actions.append(activate, remove);
+    }
+
+    row.append(mark, main, actions);
+    list.append(row);
+  }
+  createIcons({ icons: appIcons });
+}
+
 function renderMining(data) {
   const toggle = $("toggle-mining");
   toggle.replaceChildren(icon(data.mining ? "square" : "play"), document.createElement("span"));
@@ -409,6 +480,7 @@ function renderDashboard(data) {
   renderMining(data);
   renderBlocks(blocks);
   renderPeers(peers);
+  renderWalletProfiles(asArray(data.wallets), Boolean(data.mining));
 
   setText("network-protocol", data.protocol || "Unknown");
   const bootstrapState = !data.bootstrap_enabled
@@ -462,8 +534,10 @@ function renderDashboard(data) {
 
   $("open-restore-backup").disabled = Boolean(data.mining);
   $("open-restore-phrase").disabled = Boolean(data.mining);
+  $("open-create-wallet").disabled = Boolean(data.mining);
   $("open-restore-backup").title = data.mining ? "Stop mining before restoring" : "Restore encrypted backup";
   $("open-restore-phrase").title = data.mining ? "Stop mining before restoring" : "Restore recovery phrase";
+  $("open-create-wallet").title = data.mining ? "Stop mining before creating a wallet" : "Create wallet";
   $("switch-archive").disabled = pruneDepth === 0;
   $("switch-archive").title = pruneDepth === 0
     ? prunedThrough > 0 ? "Archive policy is active; previously deleted data remains unavailable" : "Archive policy is already active"
@@ -666,6 +740,12 @@ function clearSensitive(dialog) {
     state.pendingPruneRetain = 0;
     $("confirm-prune").disabled = true;
   }
+  if (dialog.id === "create-wallet-dialog") $("confirm-create-wallet").disabled = true;
+  if (dialog.id === "remove-wallet-dialog") {
+    state.pendingRemoveWallet = "";
+    setText("remove-wallet-address", "--");
+    $("confirm-remove-wallet").disabled = true;
+  }
   updateAllSensitiveCounters();
 }
 
@@ -699,6 +779,27 @@ async function removePeer(peer, button) {
     showToast(errorMessage(error), "error");
     setButtonBusy(button, false);
   }
+}
+
+async function switchWallet(address, button) {
+  if (!address) return;
+  setButtonBusy(button, true, "Switching");
+  try {
+    const result = await invoke("SwitchWallet", address);
+    showToast(`${result.message || "Wallet activated"}: ${shortHash(address, 18)}`);
+    state.history = [];
+    await Promise.all([refreshDashboard(), refreshHistory()]);
+  } catch (error) {
+    showToast(errorMessage(error), "error");
+    setButtonBusy(button, false);
+  }
+}
+
+function openRemoveWallet(address) {
+  if (!address) return;
+  openDialog("remove-wallet-dialog");
+  state.pendingRemoveWallet = address;
+  setText("remove-wallet-address", address);
 }
 
 document.querySelectorAll("[data-view]").forEach((tab) => {
@@ -809,6 +910,47 @@ $("open-recovery").addEventListener("click", () => openDialog("recovery-dialog")
 $("open-export").addEventListener("click", () => openDialog("export-dialog"));
 $("open-restore-backup").addEventListener("click", () => openDialog("restore-backup-dialog"));
 $("open-restore-phrase").addEventListener("click", () => openDialog("restore-phrase-dialog"));
+$("open-create-wallet").addEventListener("click", () => openDialog("create-wallet-dialog"));
+
+$("create-wallet-check").addEventListener("change", (event) => {
+  $("confirm-create-wallet").disabled = !event.currentTarget.checked;
+});
+
+$("confirm-create-wallet").addEventListener("click", async () => {
+  if (!$("create-wallet-check").checked) return;
+  const button = $("confirm-create-wallet");
+  setButtonBusy(button, true, "Creating");
+  try {
+    const result = await invoke("CreateWallet");
+    showToast(`${result.message || "Wallet created"}: ${shortHash(result.id, 18)}`);
+    closeDialog("create-wallet-dialog");
+    state.history = [];
+    await Promise.all([refreshDashboard(), refreshHistory()]);
+  } catch (error) {
+    showToast(errorMessage(error), "error");
+    setButtonBusy(button, false);
+  }
+});
+
+$("remove-wallet-check").addEventListener("change", (event) => {
+  $("confirm-remove-wallet").disabled = !event.currentTarget.checked;
+});
+
+$("confirm-remove-wallet").addEventListener("click", async () => {
+  const address = state.pendingRemoveWallet;
+  if (!address || !$("remove-wallet-check").checked) return;
+  const button = $("confirm-remove-wallet");
+  setButtonBusy(button, true, "Removing");
+  try {
+    const result = await invoke("RemoveWallet", address);
+    showToast(result.message || "Wallet removed");
+    closeDialog("remove-wallet-dialog");
+    await refreshDashboard();
+  } catch (error) {
+    showToast(errorMessage(error), "error");
+    setButtonBusy(button, false);
+  }
+});
 
 $("prune-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -957,7 +1099,7 @@ $("restore-backup-form").addEventListener("submit", async (event) => {
   const password = $("restore-backup-password").value;
   try {
     validatePassword(password);
-    if (!$("restore-backup-check").checked) throw new Error("Confirm active wallet replacement");
+    if (!$("restore-backup-check").checked) throw new Error("Confirm wallet import");
   } catch (error) {
     showToast(errorMessage(error), "error");
     return;
@@ -987,7 +1129,7 @@ $("restore-phrase-form").addEventListener("submit", async (event) => {
     return;
   }
   if (!$("restore-phrase-check").checked) {
-    showToast("Confirm active wallet replacement", "error");
+    showToast("Confirm wallet import", "error");
     return;
   }
   const phrase = words.join(" ");

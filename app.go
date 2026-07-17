@@ -349,7 +349,7 @@ func (a *App) RestoreWalletBackup(password string) (ActionResult, error) {
 	if err != nil {
 		return ActionResult{}, err
 	}
-	return ActionResult{ID: address, Message: "Wallet restored"}, nil
+	return ActionResult{ID: address, Message: "Wallet imported and activated"}, nil
 }
 
 func (a *App) RestoreWalletMnemonic(phrase string) (ActionResult, error) {
@@ -361,7 +361,41 @@ func (a *App) RestoreWalletMnemonic(phrase string) (ActionResult, error) {
 	if err != nil {
 		return ActionResult{}, err
 	}
-	return ActionResult{ID: address, Message: "Wallet restored from recovery phrase"}, nil
+	return ActionResult{ID: address, Message: "Wallet imported and activated"}, nil
+}
+
+func (a *App) CreateWallet() (ActionResult, error) {
+	service, err := a.readyService()
+	if err != nil {
+		return ActionResult{}, err
+	}
+	address, err := service.CreateWallet()
+	if err != nil {
+		return ActionResult{}, err
+	}
+	return ActionResult{ID: address, Message: "New wallet created and activated"}, nil
+}
+
+func (a *App) SwitchWallet(address string) (ActionResult, error) {
+	service, err := a.readyService()
+	if err != nil {
+		return ActionResult{}, err
+	}
+	if err := service.SwitchWallet(address); err != nil {
+		return ActionResult{}, err
+	}
+	return ActionResult{ID: address, Message: "Wallet activated"}, nil
+}
+
+func (a *App) RemoveWallet(address string) (ActionResult, error) {
+	service, err := a.readyService()
+	if err != nil {
+		return ActionResult{}, err
+	}
+	if err := service.RemoveWallet(address); err != nil {
+		return ActionResult{}, err
+	}
+	return ActionResult{ID: address, Message: "Wallet removed from this device"}, nil
 }
 
 func (a *App) MigrateLegacyWallet(password string) (ActionResult, error) {

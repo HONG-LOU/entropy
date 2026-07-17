@@ -155,6 +155,9 @@ func TestRecoveryMarkerIsBoundToWalletAddress(t *testing.T) {
 	if walletRecoveryConfirmed(storage, second.Address) {
 		t.Fatal("marker for the previous wallet confirmed a replacement wallet")
 	}
+	if err := os.Remove(walletProfileMarkerPath(storage, first.Address)); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(storage.Directory(), walletRecoveryMarker), []byte("confirmed-v1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +178,7 @@ func TestServiceWalletBackupAndRestoreRoundTrip(t *testing.T) {
 	if err != nil || phrase == "" {
 		t.Fatalf("recovery phrase = %q, %v", phrase, err)
 	}
-	backup := filepath.Join(directory, "wallet.entwallet")
+	backup := filepath.Join(t.TempDir(), "wallet.entwallet")
 	password := "correct horse battery staple"
 	if err := service.ExportWalletBackup(backup, password); err != nil {
 		t.Fatal(err)

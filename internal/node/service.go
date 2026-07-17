@@ -38,6 +38,7 @@ type Config struct {
 type Service struct {
 	mu                 sync.RWMutex
 	peerMutationMu     sync.Mutex
+	walletMutationMu   sync.Mutex
 	ledger             *ledger.Ledger
 	material           *vault.Material
 	wallet             core.Wallet
@@ -95,40 +96,41 @@ type Service struct {
 }
 
 type Dashboard struct {
-	Name                string         `json:"name"`
-	Symbol              string         `json:"symbol"`
-	Protocol            string         `json:"protocol"`
-	Address             string         `json:"address"`
-	ConfirmedBalance    string         `json:"confirmed_balance"`
-	SpendableBalance    string         `json:"spendable_balance"`
-	Height              uint64         `json:"height"`
-	TipHash             string         `json:"tip_hash"`
-	Difficulty          uint8          `json:"difficulty"`
-	PendingCount        int            `json:"pending_count"`
-	PeerCount           int            `json:"peer_count"`
-	ConfiguredPeerCount int            `json:"configured_peer_count"`
-	Peers               []PeerSummary  `json:"peers"`
-	Mining              bool           `json:"mining"`
-	Syncing             bool           `json:"syncing"`
-	BestPeerHeight      uint64         `json:"best_peer_height"`
-	ListenAddress       string         `json:"listen_address"`
-	Issued              string         `json:"issued"`
-	MaxSupply           string         `json:"max_supply"`
-	TargetBlockSeconds  int            `json:"target_block_seconds"`
-	EmissionBlocks      uint64         `json:"emission_blocks"`
-	NextSubsidy         string         `json:"next_subsidy"`
-	LastError           string         `json:"last_error"`
-	DatabasePath        string         `json:"database_path"`
-	DatabaseBytes       int64          `json:"database_bytes"`
-	PrunedThrough       uint64         `json:"pruned_through"`
-	PruneDepth          uint64         `json:"prune_depth"`
-	ArchiveMode         bool           `json:"archive_mode"`
-	WalletNeedsBackup   bool           `json:"wallet_needs_backup"`
-	BootstrapEnabled    bool           `json:"bootstrap_enabled"`
-	BootstrapReady      bool           `json:"bootstrap_ready"`
-	BootstrapLastUpdate int64          `json:"bootstrap_last_update,omitempty"`
-	BootstrapError      string         `json:"bootstrap_error,omitempty"`
-	RecentBlocks        []BlockSummary `json:"recent_blocks"`
+	Name                string          `json:"name"`
+	Symbol              string          `json:"symbol"`
+	Protocol            string          `json:"protocol"`
+	Address             string          `json:"address"`
+	ConfirmedBalance    string          `json:"confirmed_balance"`
+	SpendableBalance    string          `json:"spendable_balance"`
+	Height              uint64          `json:"height"`
+	TipHash             string          `json:"tip_hash"`
+	Difficulty          uint8           `json:"difficulty"`
+	PendingCount        int             `json:"pending_count"`
+	PeerCount           int             `json:"peer_count"`
+	ConfiguredPeerCount int             `json:"configured_peer_count"`
+	Peers               []PeerSummary   `json:"peers"`
+	Mining              bool            `json:"mining"`
+	Syncing             bool            `json:"syncing"`
+	BestPeerHeight      uint64          `json:"best_peer_height"`
+	ListenAddress       string          `json:"listen_address"`
+	Issued              string          `json:"issued"`
+	MaxSupply           string          `json:"max_supply"`
+	TargetBlockSeconds  int             `json:"target_block_seconds"`
+	EmissionBlocks      uint64          `json:"emission_blocks"`
+	NextSubsidy         string          `json:"next_subsidy"`
+	LastError           string          `json:"last_error"`
+	DatabasePath        string          `json:"database_path"`
+	DatabaseBytes       int64           `json:"database_bytes"`
+	PrunedThrough       uint64          `json:"pruned_through"`
+	PruneDepth          uint64          `json:"prune_depth"`
+	ArchiveMode         bool            `json:"archive_mode"`
+	WalletNeedsBackup   bool            `json:"wallet_needs_backup"`
+	Wallets             []WalletProfile `json:"wallets"`
+	BootstrapEnabled    bool            `json:"bootstrap_enabled"`
+	BootstrapReady      bool            `json:"bootstrap_ready"`
+	BootstrapLastUpdate int64           `json:"bootstrap_last_update,omitempty"`
+	BootstrapError      string          `json:"bootstrap_error,omitempty"`
+	RecentBlocks        []BlockSummary  `json:"recent_blocks"`
 }
 
 type BlockSummary struct {
@@ -367,6 +369,9 @@ func NewContext(ctx context.Context, config Config) (*Service, error) {
 			return nil, err
 		}
 	}
+	if err := service.removeStaleDiscoveredPeers(ctx); err != nil {
+		return nil, fmt.Errorf("remove stale discovered peers: %w", err)
+	}
 	keepResources = true
 	return service, nil
 }
@@ -563,12 +568,15 @@ func (s *Service) ActualAddress() string {
 }
 
 func (s *Service) Dashboard() (Dashboard, error) {
+	s.walletMutationMu.Lock()
 	s.mu.Lock()
 	if s.closing || s.ledger == nil {
 		s.mu.Unlock()
+		s.walletMutationMu.Unlock()
 		return Dashboard{}, fmt.Errorf("node is closed")
 	}
 	s.wait.Add(1)
+	defer s.wait.Done()
 	chain := s.ledger
 	address := s.wallet.Address
 	peers := s.peerSummariesLocked()
@@ -577,6 +585,7 @@ func (s *Service) Dashboard() (Dashboard, error) {
 	listenAddress := s.actualAddress
 	lastError := s.lastError
 	walletNeedsBackup := s.walletNeedsBackup
+	seedMode := s.seedMode
 	pruneDepth := s.pruneDepth
 	bootstrapEnabled := len(s.bootstrapPeers) > 0 || len(s.bootstrapURLs) > 0
 	bootstrapReady := len(s.bootstrapPeers) > 0 || !s.bootstrapSuccess.IsZero()
@@ -586,7 +595,16 @@ func (s *Service) Dashboard() (Dashboard, error) {
 	}
 	bootstrapError := s.bootstrapError
 	s.mu.Unlock()
-	defer s.wait.Done()
+	wallets := make([]WalletProfile, 0)
+	if !seedMode {
+		var err error
+		wallets, err = listWalletProfiles(s.store, address)
+		if err != nil {
+			s.walletMutationMu.Unlock()
+			return Dashboard{}, err
+		}
+	}
+	s.walletMutationMu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -661,6 +679,7 @@ func (s *Service) Dashboard() (Dashboard, error) {
 		PruneDepth:          pruneDepth,
 		ArchiveMode:         prunedThrough == 0 && pruneDepth == 0,
 		WalletNeedsBackup:   walletNeedsBackup,
+		Wallets:             wallets,
 		BootstrapEnabled:    bootstrapEnabled,
 		BootstrapReady:      bootstrapReady,
 		BootstrapLastUpdate: bootstrapLastUpdate,
@@ -680,6 +699,8 @@ func databaseSize(path string) int64 {
 }
 
 func (s *Service) Send(to, amountText, feeText string) (core.Transaction, error) {
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
 	amount, err := core.ParseAmount(amountText)
 	if err != nil {
 		return core.Transaction{}, err

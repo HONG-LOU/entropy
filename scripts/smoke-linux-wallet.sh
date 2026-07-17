@@ -56,5 +56,17 @@ fi
 [[ $(stat -c '%a' "$test_home/node/wallet.vault") == 600 ]]
 grep -q '^peers:     0$' "$test_home/wallet-status.txt"
 
+[[ $(stat -c '%a' "$test_home/node/wallets") == 700 ]]
+mapfile -t profile_vaults < <(find "$test_home/node/wallets" -maxdepth 1 -type f -name '*.vault' -print)
+[[ ${#profile_vaults[@]} -eq 1 ]]
+profile_vault=${profile_vaults[0]}
+grep -q '"protection": "linux-secret-service-user-v1"' "$profile_vault"
+grep -q '"algorithm": "xchacha20-poly1305"' "$profile_vault"
+if grep -Eq 'mnemonic|private_key' "$profile_vault"; then
+    echo "wallet profile contains plaintext secret fields" >&2
+    exit 1
+fi
+[[ $(stat -c '%a' "$profile_vault") == 600 ]]
+
 cat "$test_home/status.json"
 cat "$test_home/wallet-status.txt"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -164,6 +165,63 @@ func TestPeersEndpointReturnsOnlyRecentActivePublicPeersWithinLimit(t *testing.T
 		}
 		if _, found := excluded[peer]; found {
 			t.Fatalf("endpoint returned excluded peer %q", peer)
+		}
+	}
+}
+
+func TestStartupRemovesOnlyNeverReachableStaleDiscoveredPeers(t *testing.T) {
+	directory := t.TempDir()
+	initial, err := New(testConfig(directory))
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeTestNode(t, initial)
+	chain, err := ledger.Open(context.Background(), directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := "http://203.0.113.10:47821"
+	recent := "http://203.0.113.11:47821"
+	manual := "http://203.0.113.12:47821"
+	for _, peer := range []string{stale, recent} {
+		if err := chain.UpsertPeer(context.Background(), peer, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := chain.UpsertPeer(context.Background(), manual, true); err != nil {
+		t.Fatal(err)
+	}
+	for range staleDiscoveredFailures {
+		if err := chain.RecordPeerFailure(context.Background(), stale, time.Now(), errors.New("dial timeout")); err != nil {
+			t.Fatal(err)
+		}
+		if err := chain.RecordPeerFailure(context.Background(), manual, time.Now(), errors.New("dial timeout")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := chain.RecordPeerSuccess(context.Background(), recent, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := chain.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	node := newPublicNetworkTestNode(t, testConfig(directory))
+	node.mu.RLock()
+	_, staleFound := node.peers[stale]
+	_, recentFound := node.peers[recent]
+	_, manualFound := node.peers[manual]
+	node.mu.RUnlock()
+	if staleFound || !recentFound || !manualFound {
+		t.Fatalf("peer retention stale=%v recent=%v manual=%v", staleFound, recentFound, manualFound)
+	}
+	records, err := node.ledger.Peers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		if record.URL == stale {
+			t.Fatal("stale discovered peer remained in SQLite")
 		}
 	}
 }
@@ -361,7 +419,9 @@ func TestOutboundOnlyNodeReconcilesOfflineTransactionBacklogToSeed(t *testing.T)
 		transactions, queryErr := seed.ledger.MempoolTransactions(context.Background(), 8)
 		return queryErr == nil && len(transactions) == 1 && transactions[0].ID == transaction.ID
 	})
-	waitFor(t, 5*time.Second, func() bool { return callbackAttempts.Load() > 0 })
+	if attempts := callbackAttempts.Load(); attempts != 0 {
+		t.Fatalf("seed attempted %d NAT callbacks despite active reverse reconciliation", attempts)
+	}
 	seed.mu.RLock()
 	callbackSockets := len(seed.outboundSockets)
 	seed.mu.RUnlock()
@@ -412,7 +472,9 @@ func TestOutboundOnlyNodeReconcilesOfflineStrongerForkToSeed(t *testing.T) {
 		got, tipErr := seed.ledger.Tip(context.Background())
 		return tipErr == nil && got.Height == want.Height && got.Hash == want.Hash && got.Work.Cmp(want.Work) == 0
 	})
-	waitFor(t, 5*time.Second, func() bool { return callbackAttempts.Load() > 0 })
+	if attempts := callbackAttempts.Load(); attempts != 0 {
+		t.Fatalf("seed attempted %d NAT callbacks despite active reverse reconciliation", attempts)
+	}
 	seed.mu.RLock()
 	callbackSockets := len(seed.outboundSockets)
 	seed.mu.RUnlock()

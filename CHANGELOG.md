@@ -3,6 +3,35 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.2] - 2026-07-18
+
+### Added
+
+- Lightweight multi-wallet profiles over one chain database, including create,
+  recovery/backup import, switching, export, and guarded removal in the desktop
+  application.
+- A prioritized maturity roadmap covering audit, hash-power, release,
+  bootstrap/eclipse, wallet, fee-market, sync, privacy, and operations gaps.
+
+### Changed
+
+- Inbound WebSocket source addresses are no longer persisted as dialable peers.
+  Bidirectional reconciliation continues on the established socket without
+  requiring a NAT callback.
+- Startup removes old automatically discovered peers that have never succeeded
+  and accumulated at least eight failures. Manual and bootstrap peers remain.
+- Wallet import preserves the existing wallet instead of replacing it. The
+  active wallet must be backed up before switching, and active or unsecured
+  profiles cannot be removed.
+- Portable backups cannot be written inside the live node data directory.
+
+### Compatibility
+
+- `entropy-mainnet-v1`, genesis, consensus, transaction encoding, addresses,
+  wallet derivation, and `.entwallet` format are unchanged from v1.0.0/v1.0.1.
+- Existing `wallet.vault` files are registered as the first profile on startup;
+  no chain resynchronization or wallet re-import is required.
+
 ## [1.0.1] - 2026-07-14
 
 ### Added

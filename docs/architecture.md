@@ -1,8 +1,8 @@
-# Entropy v1.0.1 architecture
+# Entropy v1.0.2 architecture
 
 ## Scope
 
-Entropy v1.0.1 implements the `entropy-mainnet-v1` network. It is designed so
+Entropy v1.0.2 implements the `entropy-mainnet-v1` network. It is designed so
 one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
@@ -332,11 +332,12 @@ then deterministically derives a P-256 private scalar using the versioned
 a Bitcoin wallet path; importing the phrase into unrelated wallet software
 will not produce the Entropy address.
 
-The local `wallet.vault` uses Windows user-scope DPAPI or Linux Secret Service
-plus XChaCha20-Poly1305. It opens automatically only for the same OS account and
-is not a portable backup. The Linux envelope authenticates its public wallet
-descriptor and random nonce; its 256-bit master key remains in the desktop
-keyring. A `.entwallet` backup uses:
+Each local wallet profile uses Windows user-scope DPAPI or Linux Secret Service
+plus XChaCha20-Poly1305. `wallet.vault` remains the active restart pointer while
+the `wallets` directory retains protected profiles. They open automatically
+only for the same OS account and are not portable backups. The Linux envelope
+authenticates its public wallet descriptor and random nonce; its 256-bit master
+key remains in the desktop keyring. A `.entwallet` backup uses:
 
 ```text
 KDF       Argon2id v1.3, time=3, memory=64 MiB, threads=2
@@ -349,11 +350,12 @@ before allocating memory, and one process permits only one password KDF at a
 time. Local and portable writes use temporary files, flush, and atomic replace
 semantics. A corrupt or missing vault never causes silent wallet regeneration.
 
-Restoring a wallet replaces the active address and is blocked while mining.
-The ledger remains independent and can be resynchronized after wallet restore.
-Local OS protection applies to wallet nodes; seed mode deliberately has no
-persistent wallet or recovery secret and is therefore portable to supported
-servers.
+Creating or importing a wallet preserves existing profiles and activates the
+new address. Switching is blocked while mining or before the current profile's
+recovery is confirmed. The ledger is shared and remains open, so profile
+changes do not resynchronize chain state. Local OS protection applies to wallet
+nodes; seed mode deliberately has no persistent wallet or recovery secret and
+is therefore portable to supported servers.
 
 ## Testnet isolation and wallet recovery
 

@@ -1,6 +1,6 @@
 # Entropy node operations
 
-This guide covers the v1.0.1 Windows/Ubuntu desktop node, headless CLI, and
+This guide covers the v1.0.2 Windows/Ubuntu desktop node, headless CLI, and
 optional public-seed deployment. The network identity is
 `entropy-mainnet-v1`, but that is a compatibility label rather than an audit or
 production-safety claim. ENT must not carry real-world value without
@@ -17,7 +17,7 @@ Release builds provide these Windows artifacts:
 
 Ubuntu 24.04+ amd64 releases additionally provide:
 
-- `entropy_1.0.1_amd64.deb`: desktop application and CLI installer;
+- `entropy_1.0.2_amd64.deb`: desktop application and CLI installer;
 - `entropy-linux-amd64`: unpackaged desktop binary;
 - `entropy-cli-linux-amd64`: unpackaged headless node;
 - `SHA256SUMS-linux.txt`: Linux artifact checksums.
@@ -48,7 +48,7 @@ strict `--listen` behavior so operator mistakes fail visibly.
 Microsoft WebView2 Runtime is required. It is normally present on current
 Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 
-Install Ubuntu packages with `sudo apt install ./entropy_1.0.1_amd64.deb`, then
+Install Ubuntu packages with `sudo apt install ./entropy_1.0.2_amd64.deb`, then
 launch **Entropy** from the desktop menu or run `entropy`. Ubuntu stores mainnet
 state under `~/.config/Entropy/mainnet-v1`. The logged-in desktop session must
 provide an unlocked Secret Service keyring; the standard Ubuntu Desktop session
@@ -297,7 +297,7 @@ Remove-Item Env:\ENTROPY_WALLET_PASSWORD
 ```
 
 The migration preserves the old P-256 key and address but does not migrate its
-testnet chain. There is intentionally no CLI restore command in v1.0.1; start
+testnet chain. There is intentionally no CLI restore command in v1.0.2; start
 the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
@@ -331,7 +331,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v1.0.1 wallet
+### New v1.0.2 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -365,24 +365,36 @@ reset by the project.
 ### Restore from backup
 
 1. Stop mining.
-2. Open **Wallet** and choose **Restore encrypted backup**.
-3. Select the `.entwallet` file, enter its password, and confirm replacement.
+2. Open **Wallet** and choose **Add encrypted backup**.
+3. Select the `.entwallet` file, enter its password, and confirm import.
 4. Verify the displayed address against your known address.
 5. Allow the existing ledger to refresh history and balances.
 
-Restore atomically replaces the active operating-system vault. It does not
-merge two wallets and does not delete the chain database.
+Import adds or updates that wallet profile and makes it active. Existing wallet
+profiles and the chain database remain in place.
 
 ### Restore from 24 words
 
 1. Stop mining.
-2. Open **Wallet** and choose **Restore recovery phrase**.
-3. Enter exactly 24 words and confirm wallet replacement.
+2. Open **Wallet** and choose **Add recovery phrase**.
+3. Enter exactly 24 words and confirm wallet import.
 4. Verify the restored address.
 5. Export a fresh encrypted backup.
 
 Migrated v0.1 wallets do not have a phrase. Do not invent one for them; restore
 their `.entwallet` backup instead.
+
+### Multiple local wallets
+
+All wallet profiles share one validated chain database. Creating, importing,
+or switching a wallet changes only the active signing identity, balance view,
+history filter, and mining reward address. It does not restart synchronization.
+
+The current wallet must have a confirmed phrase or encrypted backup before the
+application permits switching away. Only a non-active, recovery-confirmed
+profile can be removed. Removal deletes its local OS-protected vault, not its
+on-chain history; the phrase or `.entwallet` remains sufficient to add it back.
+Entropy has no hosted account login or password-reset service.
 
 ## Recover a wallet from a testnet release
 
@@ -397,7 +409,7 @@ For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
 copy of the old directory; the command validates the key and creates verified
 local OS protection and portable encrypted copies before removing plaintext.
 
-Then start v1.0.1 normally and restore the phrase or `.entwallet` from the
+Then start v1.0.2 normally and restore the phrase or `.entwallet` from the
 desktop Wallet view. This recovers only the P-256 key and address. Mainnet
 balances, spendable outputs, confirmations, and history are derived solely from
 the mainnet chain and begin independently of every testnet balance.

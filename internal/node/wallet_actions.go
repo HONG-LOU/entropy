@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"entropy/internal/core"
 	"entropy/internal/ledger"
 	"entropy/internal/store"
 	"entropy/internal/vault"
@@ -103,6 +104,13 @@ func validateWalletBackupDestination(path, dataDirectory string) error {
 	if err != nil {
 		return fmt.Errorf("resolve wallet backup destination: %w", err)
 	}
+	root, err := normalizedWalletPath(dataDirectory)
+	if err != nil {
+		return fmt.Errorf("resolve node data directory: %w", err)
+	}
+	if walletPathsEqual(destination, root) || walletPathWithin(destination, root) {
+		return fmt.Errorf("%w: node data directory", ErrProtectedWalletBackupPath)
+	}
 	protectedNames := []string{
 		walletVaultName,
 		walletRecoveryMarker,
@@ -143,6 +151,14 @@ func walletPathsEqual(left, right string) bool {
 	return left == right
 }
 
+func walletPathWithin(path, directory string) bool {
+	prefix := filepath.Clean(directory) + string(os.PathSeparator)
+	if runtime.GOOS == "windows" {
+		return strings.HasPrefix(strings.ToLower(path), strings.ToLower(prefix))
+	}
+	return strings.HasPrefix(path, prefix)
+}
+
 func (s *Service) confirmWalletRecovery(generation uint64, address string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -167,6 +183,8 @@ func (s *Service) confirmWalletRecoveryLocked(generation uint64, address string)
 }
 
 func (s *Service) RestoreWalletBackup(path, password string) (string, error) {
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
 	if err := s.persistentWalletOperationAllowed(); err != nil {
 		return "", err
 	}
@@ -190,6 +208,8 @@ func (s *Service) RestoreWalletBackup(path, password string) (string, error) {
 }
 
 func (s *Service) RestoreWalletMnemonic(phrase string) (string, error) {
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
 	if err := s.persistentWalletOperationAllowed(); err != nil {
 		return "", err
 	}
@@ -210,9 +230,109 @@ func (s *Service) RestoreWalletMnemonic(phrase string) (string, error) {
 	return address, nil
 }
 
+func (s *Service) CreateWallet() (string, error) {
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
+	if err := s.persistentWalletOperationAllowed(); err != nil {
+		return "", err
+	}
+	material, err := vault.NewMnemonic()
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if material != nil {
+			material.Clear()
+		}
+	}()
+	if err := s.replaceWallet(material, false); err != nil {
+		return "", err
+	}
+	address := material.Wallet.Address
+	material = nil
+	return address, nil
+}
+
+func (s *Service) SwitchWallet(address string) error {
+	if err := core.ValidateAddress(address); err != nil {
+		return fmt.Errorf("switch wallet: %w", err)
+	}
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
+	if err := s.persistentWalletOperationAllowed(); err != nil {
+		return err
+	}
+	path, err := walletProfileVaultPath(s.store, address)
+	if err != nil {
+		return err
+	}
+	material, err := vault.OpenLocal(path)
+	if err != nil {
+		return fmt.Errorf("open wallet profile: %w", err)
+	}
+	defer func() {
+		if material != nil {
+			material.Clear()
+		}
+	}()
+	if material.Wallet.Address != address {
+		return fmt.Errorf("wallet profile address does not match its vault")
+	}
+	if err := s.replaceWallet(material, walletRecoveryConfirmed(s.store, address)); err != nil {
+		return err
+	}
+	material = nil
+	return nil
+}
+
+func (s *Service) RemoveWallet(address string) error {
+	if err := core.ValidateAddress(address); err != nil {
+		return fmt.Errorf("remove wallet: %w", err)
+	}
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
+	s.mu.RLock()
+	if s.closing || s.material == nil {
+		s.mu.RUnlock()
+		return fmt.Errorf("node is closed")
+	}
+	if s.seedMode {
+		s.mu.RUnlock()
+		return ErrSeedModeWalletUnavailable
+	}
+	if s.wallet.Address == address {
+		s.mu.RUnlock()
+		return fmt.Errorf("cannot remove the active wallet")
+	}
+	s.mu.RUnlock()
+	if !walletRecoveryConfirmed(s.store, address) {
+		return fmt.Errorf("secure this wallet recovery phrase or export a backup before removing it")
+	}
+	path, err := walletProfileVaultPath(s.store, address)
+	if err != nil {
+		return err
+	}
+	material, err := vault.OpenLocal(path)
+	if err != nil {
+		return fmt.Errorf("open wallet profile before removal: %w", err)
+	}
+	if material.Wallet.Address != address {
+		material.Clear()
+		return fmt.Errorf("wallet profile address does not match its vault")
+	}
+	material.Clear()
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove wallet profile: %w", err)
+	}
+	if err := removeWalletRecoveryMarker(s.store, address); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) replaceWallet(material *vault.Material, recoveryConfirmed bool) error {
 	if material == nil {
-		return fmt.Errorf("replacement wallet is missing")
+		return fmt.Errorf("wallet material is missing")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -226,10 +346,9 @@ func (s *Service) replaceWallet(material *vault.Material, recoveryConfirmed bool
 		return fmt.Errorf("stop mining before restoring a wallet")
 	}
 	if s.walletNeedsBackup {
-		return fmt.Errorf("secure the current wallet recovery phrase or export a backup before replacing it")
+		return fmt.Errorf("secure the current wallet recovery phrase or export a backup before switching wallets")
 	}
-	path := filepath.Join(s.store.Directory(), walletVaultName)
-	if err := vault.SaveLocal(path, material); err != nil {
+	if err := saveWalletProfile(s.store, material); err != nil {
 		return err
 	}
 	previous := s.material
@@ -242,7 +361,7 @@ func (s *Service) replaceWallet(material *vault.Material, recoveryConfirmed bool
 			s.walletNeedsBackup = true
 		}
 	} else {
-		_ = removeWalletRecoveryMarker(s.store)
+		_ = removeWalletRecoveryMarker(s.store, material.Wallet.Address)
 	}
 	if previous != nil {
 		previous.Clear()
@@ -262,10 +381,16 @@ func (s *Service) persistentWalletOperationAllowed() error {
 	return nil
 }
 
-func removeWalletRecoveryMarker(storage *store.Store) error {
-	path := filepath.Join(storage.Directory(), walletRecoveryMarker)
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
+func removeWalletRecoveryMarker(storage *store.Store, address string) error {
+	paths := []string{walletProfileMarkerPath(storage, address)}
+	legacyPath := filepath.Join(storage.Directory(), walletRecoveryMarker)
+	if legacyWalletRecoveryConfirmed(storage, address) {
+		paths = append(paths, legacyPath)
+	}
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove wallet recovery marker: %w", err)
+		}
 	}
 	return nil
 }
