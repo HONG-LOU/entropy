@@ -93,17 +93,22 @@ jobs:
           go test -count=1 ./...
           go vet ./...
 
+      - name: Read package version
+        run: |
+          version=$(node -p "require('./frontend/package.json').version")
+          echo "ENTROPY_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Build Ubuntu package
-        run: ./scripts/build-linux.sh 1.0.1
+        run: ./scripts/build-linux.sh "$ENTROPY_VERSION"
 
       - name: Inspect Ubuntu package
         run: |
-          dpkg-deb --info build/bin/entropy_1.0.1_amd64.deb
-          dpkg-deb --contents build/bin/entropy_1.0.1_amd64.deb
+          dpkg-deb --info "build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
+          dpkg-deb --contents "build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
           cd build/bin
           sha256sum --check SHA256SUMS-linux.txt
 
       - name: Install package and smoke-test Secret Service wallet
         run: |
-          sudo apt-get install -y ./build/bin/entropy_1.0.1_amd64.deb
+          sudo apt-get install -y "./build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
           dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entropy-cli /tmp/entropy-wallet-smoke
