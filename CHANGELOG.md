@@ -3,6 +3,21 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.4] - 2026-07-19
+
+### Fixed
+
+- Desktop chain status now reports synchronization only when an active peer
+  sync targets a height above the local validated tip. Polling an equal or
+  behind peer no longer leaves an up-to-date node labelled as synchronizing.
+- Website icon URLs are versioned so browsers refresh the Entropy E mark
+  instead of retaining an older cached application or favicon asset.
+
+### Compatibility
+
+- Consensus, `entropy-mainnet-v1`, blocks, transactions, addresses, wallets,
+  vaults, and the wire protocol are unchanged from v1.0.0-v1.0.3.
+
 ## [1.0.3] - 2026-07-19
 
 ### Added

@@ -2,7 +2,7 @@
 
 ## Mainnet warning
 
-Entropy v1.0.3 uses the compatibility identity `entropy-mainnet-v1`. The word
+Entropy v1.0.4 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
 not mean the implementation is independently audited or production-safe. ENT
 must not represent money, deposits, securities, redeemable claims, or any other
@@ -120,7 +120,7 @@ guaranteed response-time program.
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v1.0.3. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.4. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.

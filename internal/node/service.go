@@ -581,7 +581,7 @@ func (s *Service) Dashboard() (Dashboard, error) {
 	address := s.wallet.Address
 	peers := s.peerSummariesLocked()
 	mining := s.mining
-	syncing := len(s.syncing) > 0
+	peerSyncActive := len(s.syncing) > 0
 	listenAddress := s.actualAddress
 	lastError := s.lastError
 	walletNeedsBackup := s.walletNeedsBackup
@@ -664,7 +664,7 @@ func (s *Service) Dashboard() (Dashboard, error) {
 		ConfiguredPeerCount: len(peers),
 		Peers:               peers,
 		Mining:              mining,
-		Syncing:             syncing,
+		Syncing:             chainSyncInProgress(peerSyncActive, tip.Height, bestPeerHeight),
 		BestPeerHeight:      bestPeerHeight,
 		ListenAddress:       listenAddress,
 		Issued:              core.FormatAmount(core.MintedThrough(tip.Height)),
@@ -686,6 +686,10 @@ func (s *Service) Dashboard() (Dashboard, error) {
 		BootstrapError:      bootstrapError,
 		RecentBlocks:        recent,
 	}, nil
+}
+
+func chainSyncInProgress(peerSyncActive bool, localHeight, bestPeerHeight uint64) bool {
+	return peerSyncActive && bestPeerHeight > localHeight
 }
 
 func databaseSize(path string) int64 {

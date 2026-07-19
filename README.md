@@ -1,6 +1,6 @@
 # Entropy (ENT)
 
-Entropy v1.0.3 is a compact proof-of-work mainnet packaged as a Windows and
+Entropy v1.0.4 is a compact proof-of-work mainnet packaged as a Windows and
 Ubuntu desktop full node. Starting one application starts the wallet, SQLite
 ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
@@ -15,7 +15,7 @@ database server, browser tab, or background daemon.
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entropy>.
 
-## What v1.0.3 includes
+## What v1.0.4 includes
 
 - A Wails desktop node with send, receive, automatic minimum fees, mining,
   network health, history, wallet recovery, database, and pruning controls.
@@ -128,7 +128,7 @@ setup, backups, migration, pruning, and troubleshooting.
 Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
 
 ```bash
-sudo apt install ./entropy_1.0.3_amd64.deb
+sudo apt install ./entropy_1.0.4_amd64.deb
 entropy
 ```
 
@@ -289,7 +289,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.3 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.0.4 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -326,7 +326,7 @@ Authenticode-signed and builds are not yet reproducible.
 On Ubuntu 24.04:
 
 ```bash
-./scripts/build-linux.sh 1.0.3
+./scripts/build-linux.sh 1.0.4
 ```
 
 ## Documentation

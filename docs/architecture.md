@@ -1,8 +1,8 @@
-# Entropy v1.0.3 architecture
+# Entropy v1.0.4 architecture
 
 ## Scope
 
-Entropy v1.0.3 implements the `entropy-mainnet-v1` network. It is designed so
+Entropy v1.0.4 implements the `entropy-mainnet-v1` network. It is designed so
 one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
