@@ -10,8 +10,8 @@
     />
     <link rel="icon" href="data:," />
     <title>Entropy Node</title>
-    <script type="module" crossorigin src="/assets/index-6oef_rs2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B2DNdjYq.css">
+    <script type="module" crossorigin src="/assets/index-aWAS-5y1.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B5Z3PO45.css">
   </head>
   <body>
     <div id="app">
@@ -26,7 +26,6 @@
         <div class="node-state" aria-live="polite">
           <span class="status-dot" id="status-dot"></span>
           <span id="node-state-label">Starting</span>
-          <code id="listen-address">--</code>
         </div>
       </header>
 
@@ -37,9 +36,6 @@
           </button>
           <button class="view-tab" type="button" data-view="transactions">
             <i data-lucide="history"></i><span>Transactions</span>
-          </button>
-          <button class="view-tab" type="button" data-view="network">
-            <i data-lucide="network"></i><span>Network</span>
           </button>
           <button class="view-tab" type="button" data-view="wallet">
             <i data-lucide="shield-check"></i><span>Wallet</span>
@@ -92,7 +88,7 @@
           <section class="metrics" aria-label="Network metrics">
             <div class="metric"><span>Local height</span><strong id="height">0</strong></div>
             <div class="metric"><span>Network height</span><strong id="best-peer-height">0</strong></div>
-            <div class="metric"><span>Online peers</span><strong id="peer-count">0</strong></div>
+            <div class="metric"><span>Network</span><strong class="network-health connecting" id="network-health">Connecting</strong></div>
             <div class="metric"><span>Pending</span><strong id="pending-count">0</strong></div>
             <div class="metric"><span>Difficulty</span><strong id="difficulty">0</strong></div>
             <div class="metric"><span>Block target</span><strong><span id="target-seconds">10</span>s</strong></div>
@@ -112,9 +108,9 @@
                     <label for="send-amount">Amount</label>
                     <div class="amount-input"><input id="send-amount" name="amount" inputmode="decimal" placeholder="0.02" required /><span>ENT</span></div>
                   </div>
-                  <div>
-                    <label for="send-fee">Fee</label>
-                    <div class="amount-input"><input id="send-fee" name="fee" inputmode="decimal" value="0.001" required /><span>ENT</span></div>
+                  <div class="fee-summary">
+                    <span>Network fee</span>
+                    <strong>Automatic minimum</strong>
                   </div>
                 </div>
                 <button class="primary-button full-button" type="submit"><i data-lucide="send"></i><span>Send transaction</span></button>
@@ -171,32 +167,6 @@
                 <tbody id="history-body"><tr><td colspan="5" class="empty-cell">Loading transactions</td></tr></tbody>
               </table>
             </div>
-          </section>
-        </section>
-
-        <section class="view" id="view-network" data-view-panel="network" hidden>
-          <div class="view-heading">
-            <div><p class="eyebrow">Peer-to-peer</p><h1>Network</h1></div>
-            <span class="count-badge" id="peer-badge">0</span>
-          </div>
-          <section class="network-metrics" aria-label="Network status">
-            <div><span>Protocol</span><strong id="network-protocol">--</strong></div>
-            <div><span>Public bootstrap</span><strong id="network-bootstrap">Starting</strong></div>
-            <div><span>Listening</span><strong id="network-listen">--</strong></div>
-            <div><span>Sync state</span><strong id="network-sync">Checking</strong></div>
-          </section>
-          <section class="surface peers-surface" aria-labelledby="peers-heading">
-            <div class="section-heading network-heading">
-              <div><p class="eyebrow">Known nodes</p><h2 id="peers-heading">Peers</h2></div>
-              <form id="peer-form" class="peer-form">
-                <label class="sr-only" for="peer-url">Node URL</label>
-                <div class="inline-form">
-                  <input id="peer-url" autocomplete="off" placeholder="http://192.168.1.20:47821" required />
-                  <button class="icon-button solid" type="submit" title="Add peer" aria-label="Add peer"><i data-lucide="plus"></i></button>
-                </div>
-              </form>
-            </div>
-            <ul class="peer-list" id="peer-list"><li class="empty-row">Waiting for peer data</li></ul>
           </section>
         </section>
 

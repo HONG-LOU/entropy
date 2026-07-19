@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"entropy/internal/core"
+	"entropy/internal/ledger"
 
 	"github.com/gorilla/websocket"
 )
@@ -76,9 +77,12 @@ func TestTwoNodesPropagateTransactionAndBlockIncrementally(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := time.Now()
-	transaction, err := nodeA.Send(nodeB.Address(), "0.02", "0.001")
+	transaction, fee, err := nodeA.SendRecommended(nodeB.Address(), "0.02")
 	if err != nil {
 		t.Fatalf("send: %v", err)
+	}
+	if want := ledger.MinimumRelayFee(core.EncodedTransactionSize(transaction)); fee != want {
+		t.Fatalf("automatic fee = %d, want %d", fee, want)
 	}
 	if elapsed := time.Since(started); elapsed >= time.Second {
 		t.Fatalf("local transaction acceptance waited on a slow peer for %s", elapsed)
@@ -93,7 +97,7 @@ func TestTwoNodesPropagateTransactionAndBlockIncrementally(t *testing.T) {
 	}
 	waitFor(t, 20*time.Second, func() bool {
 		dashboard, err := nodeA.Dashboard()
-		return err == nil && dashboard.Height == 2 && strings.HasPrefix(dashboard.ConfirmedBalance, "0.042")
+		return err == nil && dashboard.Height == 2 && strings.HasPrefix(dashboard.ConfirmedBalance, "0.043")
 	})
 	history, err := nodeB.TransactionHistory(20)
 	if err != nil {

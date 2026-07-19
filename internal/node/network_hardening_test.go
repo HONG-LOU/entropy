@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -305,8 +306,8 @@ func TestStagingSingleBudgetCleanupAndAtomicRollback(t *testing.T) {
 	if maxBlockBatch != maxBlockDownloadBatch {
 		t.Fatalf("served block batch %d does not match download batch %d", maxBlockBatch, maxBlockDownloadBatch)
 	}
-	if maxDirectExtensionBlocks != maxBlockBatch {
-		t.Fatalf("direct extension chunk %d can exceed one bounded protocol batch %d", maxDirectExtensionBlocks, maxBlockBatch)
+	if maxDirectExtensionBlocks != maxSyncHeaderBatch || maxDirectExtensionBlocks <= maxBlockBatch {
+		t.Fatalf("direct extension chunk %d does not reuse a %d-header page across bounded %d-block requests", maxDirectExtensionBlocks, maxSyncHeaderBatch, maxBlockBatch)
 	}
 	if int64(maxDirectExtensionBlocks)*(maxBlockBodyBytes+4) > maxStagedForkBytes {
 		t.Fatal("direct extension chunk can exceed the staging budget at legal per-block limits")
@@ -394,6 +395,50 @@ func TestStagingSingleBudgetCleanupAndAtomicRollback(t *testing.T) {
 	}
 	if _, err := os.Stat(stagedPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("replacement staging file still exists: %v", err)
+	}
+}
+
+func TestStageBlocksReusesHeadersAcrossBoundedBodyBatches(t *testing.T) {
+	service := newTestNode(t)
+	count := maxBlockDownloadBatch + 1
+	headers := make([]core.Block, 0, count)
+	bodies := make(map[string]core.Block, count)
+	for index := 0; index < count; index++ {
+		block := core.Block{
+			Version: 1, Height: uint64(index + 1), Hash: fmt.Sprintf("%064x", index+1),
+		}
+		headers = append(headers, block)
+		bodies[block.Hash] = block
+	}
+	requested := make([]int, 0, 2)
+	peer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var query blocksRequest
+		if err := json.NewDecoder(request.Body).Decode(&query); err != nil {
+			writeError(writer, http.StatusBadRequest, err)
+			return
+		}
+		requested = append(requested, len(query.Hashes))
+		blocks := make([]core.Block, 0, len(query.Hashes))
+		for _, hash := range query.Hashes {
+			blocks = append(blocks, bodies[hash])
+		}
+		writeJSON(writer, http.StatusOK, blocksResponse{Protocol: ledger.ProtocolName, Blocks: blocks})
+	}))
+	defer peer.Close()
+
+	staged, err := service.stageBlocks(context.Background(), peer.URL, headers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer staged.Close()
+	if fmt.Sprint(requested) != fmt.Sprint([]int{maxBlockDownloadBatch, 1}) {
+		t.Fatalf("body batch sizes = %v", requested)
+	}
+	for index, header := range headers {
+		block, err := staged.BlockAt(index)
+		if err != nil || block.Hash != header.Hash {
+			t.Fatalf("staged block %d = %s, err %v", index, block.Hash, err)
+		}
 	}
 }
 

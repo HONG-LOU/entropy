@@ -18,7 +18,6 @@ import {
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
-  Network,
   Pickaxe,
   Play,
   Plus,
@@ -60,7 +59,6 @@ const appIcons = {
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
-  Network,
   Pickaxe,
   Play,
   Plus,
@@ -276,55 +274,6 @@ function renderBlocks(blocks) {
   }
 }
 
-function peerMeta(peer) {
-  const parts = [peer.online && peer.active_outbound ? "Online" : peer.active_outbound ? "Connecting" : "Standby"];
-  if (asNumber(peer.height) > 0) parts.push(`height #${asNumber(peer.height).toLocaleString()}`);
-  parts.push(peer.bootstrap ? "Bootstrap" : peer.discovered ? peer.public ? "Public discovery" : "Local discovery" : "Manual");
-  if (peer.active_outbound) parts.push("Outbound");
-  if (asNumber(peer.failures) > 0) parts.push(`${asNumber(peer.failures)} failures`);
-  return parts.join(" | ");
-}
-
-function renderPeers(peers) {
-  const list = $("peer-list");
-  list.replaceChildren();
-  if (peers.length === 0) {
-    const empty = document.createElement("li");
-    empty.className = "empty-row";
-    empty.textContent = "No peers configured or discovered";
-    list.append(empty);
-    return;
-  }
-
-  for (const peer of peers) {
-    const row = document.createElement("li");
-    if (peer.last_error) row.title = String(peer.last_error);
-
-    const dot = document.createElement("span");
-    dot.className = `peer-dot${peer.online && peer.active_outbound ? "" : " offline"}`;
-
-    const main = document.createElement("div");
-    main.className = "peer-main";
-    const url = document.createElement("code");
-    url.textContent = String(peer.url || "Unknown peer");
-    const meta = document.createElement("span");
-    meta.textContent = peerMeta(peer);
-    main.append(url, meta);
-
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "icon-button remove-peer";
-    remove.title = `Remove ${peer.url || "peer"}`;
-    remove.setAttribute("aria-label", `Remove ${peer.url || "peer"}`);
-    remove.append(icon("trash-2"));
-    remove.addEventListener("click", () => removePeer(String(peer.url || ""), remove));
-
-    row.append(dot, main);
-    if (!peer.bootstrap) row.append(remove);
-    list.append(row);
-  }
-}
-
 function renderWalletProfiles(profiles, mining) {
   const list = $("wallet-profile-list");
   list.replaceChildren();
@@ -413,12 +362,16 @@ function renderSync(data) {
   syncIcon.classList.toggle("active", Boolean(data.syncing));
 
   const onlinePeers = asNumber(data.peer_count);
+  const networkHealth = $("network-health");
+  networkHealth.className = "network-health";
   if (data.bootstrap_enabled && onlinePeers === 0) {
     setText("sync-label", "Connecting to the network");
     setText("sync-detail", data.bootstrap_error ? "Public seeds are being retried" : "Discovering public peers");
     progress.style.width = "35%";
     progress.classList.add("indeterminate");
     syncIcon.classList.add("active");
+    networkHealth.textContent = "Connecting";
+    networkHealth.classList.add("connecting");
   } else if (data.syncing) {
     setText("sync-label", "Synchronizing chain");
     setText("sync-detail", reportedBest > localHeight
@@ -430,22 +383,25 @@ function renderSync(data) {
       progress.style.width = "35%";
       progress.classList.add("indeterminate");
     }
+    networkHealth.textContent = "Syncing";
+    networkHealth.classList.add("syncing");
   } else if (reportedBest > localHeight) {
     setText("sync-label", "Peer chain is ahead");
     setText("sync-detail", `Local #${localHeight.toLocaleString()} | peer #${reportedBest.toLocaleString()}`);
     progress.style.width = `${Math.min(100, (localHeight / reportedBest) * 100)}%`;
+    networkHealth.textContent = "Behind";
+    networkHealth.classList.add("syncing");
   } else {
     setText("sync-label", "Chain synchronized");
     setText("sync-detail", `Validated through block #${localHeight.toLocaleString()}`);
     progress.style.width = "100%";
+    networkHealth.textContent = onlinePeers > 0 ? "Online" : "Offline";
+    networkHealth.classList.add(onlinePeers > 0 ? "online" : "offline");
   }
-
-  setText("network-sync", onlinePeers === 0 ? "Waiting for peers" : data.syncing ? `Syncing ${localHeight.toLocaleString()} / ${bestHeight.toLocaleString()}` : "Synchronized");
 }
 
 function renderDashboard(data) {
   state.dashboard = data;
-  const peers = asArray(data.peers);
   const blocks = asArray(data.recent_blocks);
   const localHeight = asNumber(data.height);
 
@@ -454,17 +410,14 @@ function renderDashboard(data) {
   setText("wallet-address", data.address || "Unavailable");
   setText("wallet-page-address", data.address || "Unavailable");
   setText("height", localHeight.toLocaleString());
-  setText("peer-count", asNumber(data.peer_count).toLocaleString());
   setText("pending-count", asNumber(data.pending_count).toLocaleString());
   setText("difficulty", asNumber(data.difficulty).toLocaleString());
   setText("target-seconds", asNumber(data.target_block_seconds).toLocaleString());
-  setText("listen-address", data.listen_address || "Not listening");
   setText("issued", formatAmount(data.issued));
   setText("max-supply", formatAmount(data.max_supply));
   setText("next-reward", formatAmount(data.next_subsidy));
   setText("tip-hash", shortHash(data.tip_hash, 18));
   $("tip-hash").title = String(data.tip_hash || "");
-  setText("peer-badge", `${asNumber(data.peer_count)}/${asNumber(data.configured_peer_count)}`);
 
   const issued = asNumber(data.issued);
   const maximum = asNumber(data.max_supply);
@@ -479,22 +432,7 @@ function renderDashboard(data) {
   renderSync(data);
   renderMining(data);
   renderBlocks(blocks);
-  renderPeers(peers);
   renderWalletProfiles(asArray(data.wallets), Boolean(data.mining));
-
-  setText("network-protocol", data.protocol || "Unknown");
-  const bootstrapState = !data.bootstrap_enabled
-    ? "Disabled"
-    : asNumber(data.peer_count) > 0
-      ? "Connected"
-      : data.bootstrap_ready
-        ? "Seeds loaded"
-        : data.bootstrap_error
-          ? "Retrying"
-          : "Discovering";
-  setText("network-bootstrap", bootstrapState);
-  $("network-bootstrap").title = String(data.bootstrap_error || "");
-  setText("network-listen", data.listen_address || "Not listening");
   setText("database-path", data.database_path || "Unavailable");
   $("database-path").title = String(data.database_path || "");
   setText("database-size", formatBytes(data.database_bytes));
@@ -768,19 +706,6 @@ function updateAllSensitiveCounters() {
   setText("restore-word-count", `${words} / 24 words`);
 }
 
-async function removePeer(peer, button) {
-  if (!peer) return;
-  setButtonBusy(button, true, "Removing");
-  try {
-    const result = await invoke("RemovePeer", peer);
-    showToast(result.message || "Peer removed");
-    await refreshDashboard();
-  } catch (error) {
-    showToast(errorMessage(error), "error");
-    setButtonBusy(button, false);
-  }
-}
-
 async function switchWallet(address, button) {
   if (!address) return;
   setButtonBusy(button, true, "Switching");
@@ -827,7 +752,6 @@ $("send-form").addEventListener("submit", async (event) => {
   const button = form.querySelector('button[type="submit"]');
   const to = $("send-to").value.trim();
   const amount = $("send-amount").value.trim();
-  const fee = $("send-fee").value.trim();
   if (!to) {
     showToast("Recipient address is required", "error");
     return;
@@ -836,14 +760,10 @@ $("send-form").addEventListener("submit", async (event) => {
     showToast("Amount must be positive with no more than 8 decimal places", "error");
     return;
   }
-  if (!isAmount(fee, true)) {
-    showToast("Fee must be zero or positive with no more than 8 decimal places", "error");
-    return;
-  }
 
   setButtonBusy(button, true, "Broadcasting");
   try {
-    const result = await invoke("SendTransaction", to, amount, fee);
+    const result = await invoke("SendTransaction", to, amount);
     showToast(`${result.message || "Transaction submitted"}: ${shortHash(result.id)}`);
     $("send-amount").value = "";
     await Promise.all([refreshDashboard(), refreshHistory()]);
@@ -881,26 +801,6 @@ $("mine-once").addEventListener("click", async () => {
     showToast(errorMessage(error), "error");
   } finally {
     setButtonBusy(button, false);
-  }
-});
-
-$("peer-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const input = $("peer-url");
-  const button = form.querySelector('button[type="submit"]');
-  const peer = input.value.trim();
-  if (!peer) return;
-  button.disabled = true;
-  try {
-    const result = await invoke("AddPeer", peer);
-    showToast(result.message || "Peer added");
-    input.value = "";
-    await refreshDashboard();
-  } catch (error) {
-    showToast(errorMessage(error), "error");
-  } finally {
-    button.disabled = false;
   }
 });
 

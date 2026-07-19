@@ -219,6 +219,11 @@ func minimumRelayFee(encodedSize int) uint64 {
 	return kibibytes * MinimumRelayFeePerKibiByte
 }
 
+// MinimumRelayFee returns the local relay minimum for an encoded transaction.
+func MinimumRelayFee(encodedSize int) uint64 {
+	return minimumRelayFee(encodedSize)
+}
+
 func lookupMempoolSpendable(
 	ctx context.Context,
 	query sqlQueryer,

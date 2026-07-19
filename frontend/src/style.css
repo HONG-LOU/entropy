@@ -158,6 +158,9 @@ svg { stroke-width: 1.8; }
 .metric > span { display: block; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .metric strong { display: block; min-width: 0; margin-top: 4px; overflow: hidden; font-size: 18px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .metric strong span { display: inline; color: inherit; font-size: inherit; }
+.network-health.online { color: var(--green); }
+.network-health.connecting, .network-health.syncing { color: #9a6a16; }
+.network-health.offline { color: var(--red); }
 
 .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
 .surface { min-width: 0; padding: 19px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 1px 1px rgba(23, 27, 26, 0.03); }
@@ -184,6 +187,20 @@ input:not([type="checkbox"]):focus, textarea:focus { border-color: var(--green-b
 .amount-input { position: relative; }
 .amount-input input { padding-right: 44px; }
 .amount-input span { position: absolute; top: 13px; right: 11px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.fee-summary {
+  min-height: 40px;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 11px;
+  background: #f3f6f4;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.fee-summary span { color: var(--muted); font-size: 10px; }
+.fee-summary strong { margin-top: 2px; font-size: 12px; }
 
 .icon-button {
   width: 32px;

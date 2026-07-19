@@ -31,6 +31,7 @@ const (
 	httpRequestRateStateRetention = 10 * time.Minute
 	websocketHandshakesPerSecond  = float64(2)
 	websocketHandshakeBurst       = float64(4)
+	peerSyncRoundTimeout          = 2 * time.Minute
 )
 
 type requestRateState struct {
@@ -261,7 +262,7 @@ func (s *Service) syncPeerMode(peer string, force bool) {
 		return
 	}
 	defer s.endPeerSync(peer)
-	ctx, cancel := context.WithTimeout(s.backgroundContext(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(s.backgroundContext(), peerSyncRoundTimeout)
 	defer cancel()
 	var remote protocolStatus
 	if err := s.getJSON(ctx, peer+"/v2/status", 64<<10, &remote); err != nil {
@@ -409,14 +410,14 @@ func (s *Service) syncRemoteChainFrom(ctx context.Context, source remoteChainSou
 		diverged          bool
 	)
 	for len(headers) < maxHeadersPerSync {
-		response, err := source.requestHeaders(ctx, headersRequest{Locator: locator, Limit: maxHeaderBatch})
+		response, err := source.requestHeaders(ctx, headersRequest{Locator: locator, Limit: maxSyncHeaderBatch})
 		if err != nil {
 			return err
 		}
 		if response.Protocol != ledger.ProtocolName {
 			return fmt.Errorf("peer returned incompatible headers")
 		}
-		if len(response.Headers) > maxHeaderBatch {
+		if len(response.Headers) > maxSyncHeaderBatch {
 			return fmt.Errorf("peer exceeded the header page limit")
 		}
 		if len(headers)+len(response.Headers) > maxHeadersPerSync {
@@ -500,7 +501,7 @@ func (s *Service) syncRemoteChainFrom(ctx context.Context, source remoteChainSou
 			s.maybePrune(s.ledger)
 			return nil
 		}
-		if len(response.Headers) < maxHeaderBatch {
+		if len(response.Headers) < maxSyncHeaderBatch {
 			break
 		}
 		locator = []string{previous.Hash}

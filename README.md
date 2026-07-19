@@ -1,6 +1,6 @@
 # Entropy (ENT)
 
-Entropy v1.0.2 is a compact proof-of-work mainnet packaged as a Windows and
+Entropy v1.0.3 is a compact proof-of-work mainnet packaged as a Windows and
 Ubuntu desktop full node. Starting one application starts the wallet, SQLite
 ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
@@ -15,10 +15,10 @@ database server, browser tab, or background daemon.
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entropy>.
 
-## What v1.0.2 includes
+## What v1.0.3 includes
 
-- A Wails desktop node with send, receive, mining, peer, history, wallet
-  recovery, database, and pruning controls.
+- A Wails desktop node with send, receive, automatic minimum fees, mining,
+  network health, history, wallet recovery, database, and pruning controls.
 - A UTXO ledger in SQLite with WAL, `synchronous=FULL`, indexed balances and
   history, persistent mempool and peers, per-block undo records, atomic reorgs,
   and startup integrity checks.
@@ -27,16 +27,17 @@ The source repository is public and MIT-licensed:
   nodes. The old whole-chain `/v1/state` exchange is removed.
 - WebSocket transaction and block broadcast for low-latency relay, with HTTP
   broadcast as a fallback delivery path and bounded reconnect catch-up.
-- Automatic LAN discovery plus persistent manual peers, connection limits,
-  and exponential retry backoff.
+- Automatic LAN discovery, remote mainnet Seed refresh, bounded public peer
+  exchange, connection limits, persistent operator peers, and exponential
+  retry backoff.
 - Windows DPAPI-protected or Linux Secret Service-protected local wallet
   profiles, with create/import/switch/guarded removal over one chain database,
   24-word BIP39 recovery, and portable Argon2id/XChaCha20-Poly1305
   `.entwallet` backups.
 - Archive and pruned storage modes. Both validate incoming blocks locally;
   archive nodes additionally keep and serve all historical bodies.
-- Built-in HTTPS bootstrap manifests with bounded validation and independent
-  repository/CDN delivery paths, plus persistent manual peers.
+- Built-in HTTPS bootstrap manifests with bounded validation, independent
+  repository/CDN delivery paths, and two public archive Seeds.
 - Strict network isolation: published testnet chains are never imported or
   replayed by mainnet. A known recovery phrase or verified `.entwallet` backup
   can restore the same wallet key into a fresh mainnet ledger.
@@ -127,7 +128,7 @@ setup, backups, migration, pruning, and troubleshooting.
 Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
 
 ```bash
-sudo apt install ./entropy_1.0.2_amd64.deb
+sudo apt install ./entropy_1.0.3_amd64.deb
 entropy
 ```
 
@@ -288,7 +289,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.2 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.0.3 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -325,7 +326,7 @@ Authenticode-signed and builds are not yet reproducible.
 On Ubuntu 24.04:
 
 ```bash
-./scripts/build-linux.sh 1.0.2
+./scripts/build-linux.sh 1.0.3
 ```
 
 ## Documentation

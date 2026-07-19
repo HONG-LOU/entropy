@@ -1,8 +1,8 @@
-# Entropy v1.0.2 architecture
+# Entropy v1.0.3 architecture
 
 ## Scope
 
-Entropy v1.0.2 implements the `entropy-mainnet-v1` network. It is designed so
+Entropy v1.0.3 implements the `entropy-mainnet-v1` network. It is designed so
 one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
@@ -90,8 +90,9 @@ Deterministic resource limits include a 1 MiB block, 64 KiB transaction, 2,000
 transactions per block, 256 inputs and outputs per transaction, and 5,000
 pending transactions. Local relay policy further caps the mempool at 32 MiB
 and 20,000 total inputs and requires at least 1,000 atomic units (0.00001000
-ENT) of fee per started KiB. Even a maximum-size transaction remains below the
-desktop's default 0.001 ENT fee. Miners prioritize fee rate while preserving
+ENT) of fee per started KiB. The desktop builds the transaction, measures its
+encoded size, and automatically selects this minimum; CLI callers may
+voluntarily pay more. Miners prioritize fee rate while preserving
 pending parent-before-child dependencies. Those mempool limits and ordering
 rules are policy, not block-consensus rules.
 
@@ -249,11 +250,11 @@ An incomplete but progressing round schedules a bounded follow-up. Successful
 outbound sync polls also send a current status over the live socket, so large
 paged backlogs continue until convergence.
 
-A scheduled peer-sync session has a 30-second context. A direct-extension chunk
-commits at most eight blocks, and one session attempts at most 32 chunks, so it
-can advance at most 256 directly extending blocks before the next scheduled
-session. It stops starting new chunks when less than five seconds remain; these
-bounds preserve responsiveness while still making continuous catch-up progress.
+A scheduled HTTP peer-sync session has a two-minute context. A direct extension
+requests 128 headers, validates the page once, then reuses it across sixteen
+requests of at most eight block bodies before one atomic commit. One session
+attempts at most 32 such chunks and stops starting chunks when less than five
+seconds remain. The 512 MiB staging ceiling remains independent of peer input.
 One WebSocket reconcile round has the same 30-second bound, at most two pending
 correlated requests, at most 64 mempool transactions, and no more than one
 active round per socket. The internal downloader groups up to eight bodies, then
@@ -285,9 +286,10 @@ At startup, desktop and default CLI configurations fetch the versioned mainnet
 bootstrap manifest over HTTPS from the public repository and a CDN mirror. A
 manifest is only a bounded peer-location hint: every peer and every received
 object is still validated locally, and a manifest cannot change consensus. The
-mainnet manifest publishes `https://template-chat.xyz` as an externally
-verified archive seed. Startup continues with LAN/manual peers when every
-manifest source is empty or unavailable.
+mainnet manifest publishes `https://template-chat.xyz` and
+`https://node.entcoin.xyz` as archive seeds. It refreshes every six hours, so
+seed changes do not require an application release. Startup continues with
+LAN/manual peers when every manifest source is empty or unavailable.
 
 See [Mainnet protocol](protocol.md) for endpoint and message details.
 

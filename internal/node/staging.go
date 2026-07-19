@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	maxDirectExtensionBlocks = maxBlockBatch
+	maxDirectExtensionBlocks = maxSyncHeaderBatch
 	maxStagedForkBytes       = int64(512 << 20)
 	maxBlockDownloadBatch    = 8
 )

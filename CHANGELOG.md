@@ -3,6 +3,31 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.3] - 2026-07-19
+
+### Added
+
+- A second public archive seed, `https://node.entcoin.xyz`, in the remotely
+  refreshed mainnet bootstrap manifest.
+- Automatic desktop transaction fees based on the transaction's encoded size
+  and the node's minimum relay policy.
+
+### Changed
+
+- Direct-extension synchronization now reuses each validated 128-header page
+  across sixteen bounded 8-block body requests instead of discarding all but
+  eight headers. Scheduled HTTP sync rounds may run for up to two minutes.
+- The desktop replaces the detailed Network page and manual peer form with a
+  compact Online, Syncing, Connecting, Behind, or Offline status.
+
+### Compatibility
+
+- Consensus, `entropy-mainnet-v1`, blocks, transactions, addresses, wallets,
+  vaults, and the wire protocol are unchanged from v1.0.0-v1.0.2.
+- Older nodes discover both archive seeds when they next refresh the public
+  manifest; installing v1.0.3 is required only for the faster synchronizer and
+  desktop changes.
+
 ## [1.0.2] - 2026-07-18
 
 ### Added

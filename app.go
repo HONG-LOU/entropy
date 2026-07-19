@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"entropy/internal/core"
 	"entropy/internal/ledger"
 	"entropy/internal/node"
 
@@ -177,16 +178,19 @@ func (a *App) RetryStartup() (StartupState, error) {
 	return state, nil
 }
 
-func (a *App) SendTransaction(to, amount, fee string) (ActionResult, error) {
+func (a *App) SendTransaction(to, amount string) (ActionResult, error) {
 	service, err := a.readyService()
 	if err != nil {
 		return ActionResult{}, err
 	}
-	tx, err := service.Send(to, amount, fee)
+	tx, fee, err := service.SendRecommended(to, amount)
 	if err != nil {
 		return ActionResult{}, err
 	}
-	return ActionResult{ID: tx.ID, Message: "Transaction added to local pending pool"}, nil
+	return ActionResult{
+		ID:      tx.ID,
+		Message: fmt.Sprintf("Transaction added to local pending pool with %s ENT fee", core.FormatAmount(fee)),
+	}, nil
 }
 
 func (a *App) MineOneBlock() (ActionResult, error) {

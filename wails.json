@@ -12,7 +12,7 @@
   "info": {
     "companyName": "Entropy Project",
     "productName": "Entropy",
-    "productVersion": "1.0.2",
+    "productVersion": "1.0.3",
     "copyright": "2026 Entropy Project",
     "comments": "Entropy proof-of-work mainnet desktop full node"
   }

@@ -2,6 +2,7 @@
   "version": 1,
   "protocol": "entropy-mainnet-v1",
   "peers": [
+    "https://node.entcoin.xyz",
     "https://template-chat.xyz"
   ]
 }

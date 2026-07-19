@@ -699,8 +699,6 @@ func databaseSize(path string) int64 {
 }
 
 func (s *Service) Send(to, amountText, feeText string) (core.Transaction, error) {
-	s.walletMutationMu.Lock()
-	defer s.walletMutationMu.Unlock()
 	amount, err := core.ParseAmount(amountText)
 	if err != nil {
 		return core.Transaction{}, err
@@ -709,14 +707,29 @@ func (s *Service) Send(to, amountText, feeText string) (core.Transaction, error)
 	if err != nil {
 		return core.Transaction{}, err
 	}
+	transaction, _, err := s.sendTransaction(to, amount, &fee)
+	return transaction, err
+}
+
+func (s *Service) SendRecommended(to, amountText string) (core.Transaction, uint64, error) {
+	amount, err := core.ParseAmount(amountText)
+	if err != nil {
+		return core.Transaction{}, 0, err
+	}
+	return s.sendTransaction(to, amount, nil)
+}
+
+func (s *Service) sendTransaction(to string, amount uint64, fixedFee *uint64) (core.Transaction, uint64, error) {
+	s.walletMutationMu.Lock()
+	defer s.walletMutationMu.Unlock()
 	s.mu.Lock()
 	if s.closing || s.ledger == nil {
 		s.mu.Unlock()
-		return core.Transaction{}, fmt.Errorf("node is closed")
+		return core.Transaction{}, 0, fmt.Errorf("node is closed")
 	}
 	if s.seedMode {
 		s.mu.Unlock()
-		return core.Transaction{}, ErrSeedModeWalletUnavailable
+		return core.Transaction{}, 0, ErrSeedModeWalletUnavailable
 	}
 	s.wait.Add(1)
 	chain := s.ledger
@@ -725,17 +738,35 @@ func (s *Service) Send(to, amountText, feeText string) (core.Transaction, error)
 	defer s.wait.Done()
 	utxo, err := chain.SpendableUTXO(context.Background(), wallet.Address)
 	if err != nil {
-		return core.Transaction{}, err
+		return core.Transaction{}, 0, err
 	}
-	transaction, err := core.BuildTransaction(&wallet, to, amount, fee, utxo)
-	if err != nil {
-		return core.Transaction{}, err
+	fee := ledger.MinimumRelayFee(1)
+	if fixedFee != nil {
+		fee = *fixedFee
+	}
+	var transaction core.Transaction
+	for attempt := 0; ; attempt++ {
+		transaction, err = core.BuildTransaction(&wallet, to, amount, fee, utxo)
+		if err != nil {
+			return core.Transaction{}, 0, err
+		}
+		if fixedFee != nil {
+			break
+		}
+		required := ledger.MinimumRelayFee(core.EncodedTransactionSize(transaction))
+		if fee >= required {
+			break
+		}
+		if attempt >= core.MaxTransactionInputs {
+			return core.Transaction{}, 0, fmt.Errorf("automatic fee calculation did not converge")
+		}
+		fee = required
 	}
 	if err := chain.AddTransaction(context.Background(), transaction); err != nil {
-		return core.Transaction{}, err
+		return core.Transaction{}, 0, err
 	}
 	s.broadcastTransaction(transaction, nil)
-	return transaction, nil
+	return transaction, fee, nil
 }
 
 func (s *Service) MineOnce(ctx context.Context) (core.Block, error) {

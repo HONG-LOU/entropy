@@ -10,6 +10,7 @@ const (
 	maxBlockBodyBytes          = int64(2 * core.MaxBlockBytes)
 	maxProtocolBytes           = maxBlockBodyBytes + 16<<10
 	maxHeaderBatch             = 2_000
+	maxSyncHeaderBatch         = 128
 	maxBlockBatch              = 8
 	maxPeerConnections         = 64
 )
