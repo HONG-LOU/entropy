@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func (l *Ledger) TransactionHistory(ctx context.Context, address string, limit int) ([]TransactionRecord, error) {

@@ -34,16 +34,20 @@ jobs:
       - name: Build and verify release artifacts
         shell: pwsh
         run: .\scripts\build.ps1
+        env:
+          ENTCOIN_WINDOWS_CERTIFICATE_BASE64: ${{ secrets.ENTCOIN_WINDOWS_CERTIFICATE_BASE64 }}
+          ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD }}
+          ENTCOIN_WINDOWS_TIMESTAMP_URL: ${{ vars.ENTCOIN_WINDOWS_TIMESTAMP_URL }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: entropy-windows-amd64
+          name: entcoin-windows-amd64
           if-no-files-found: error
           path: |
-            build/bin/Entropy.exe
-            build/bin/entropy-amd64-installer.exe
-            build/bin/entropy-cli.exe
-            build/bin/entropy-windows-seed-deploy.zip
+            build/bin/Entcoin.exe
+            build/bin/entcoin-amd64-installer.exe
+            build/bin/entcoin-cli.exe
+            build/bin/entcoin-windows-seed-deploy.zip
             build/bin/SHA256SUMS.txt
 
   linux-build:
@@ -79,17 +83,17 @@ jobs:
 
       - name: Install package and smoke-test Secret Service wallet
         run: |
-          sudo apt-get install -y ./build/bin/entropy_*_amd64.deb
-          dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entropy-cli /tmp/entropy-wallet-smoke
+          sudo apt-get install -y ./build/bin/entcoin_*_amd64.deb
+          dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entcoin-cli /tmp/entcoin-wallet-smoke
 
       - uses: actions/upload-artifact@v4
         with:
-          name: entropy-linux-amd64
+          name: entcoin-linux-amd64
           if-no-files-found: error
           path: |
-            build/bin/entropy-linux-amd64
-            build/bin/entropy-cli-linux-amd64
-            build/bin/entropy_*_amd64.deb
+            build/bin/entcoin-linux-amd64
+            build/bin/entcoin-cli-linux-amd64
+            build/bin/entcoin_*_amd64.deb
             build/bin/SHA256SUMS-linux.txt
 
   publish:
@@ -98,12 +102,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: entropy-*-amd64
+          pattern: entcoin-*-amd64
           path: release-assets
           merge-multiple: true
 
       - uses: softprops/action-gh-release@v2
         with:
+          body: |
+            Windows artifacts in ${{ github.ref_name }} are not Authenticode-signed and may trigger Microsoft Defender SmartScreen. Verify the published SHA-256 checksums before use.
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-assets/*

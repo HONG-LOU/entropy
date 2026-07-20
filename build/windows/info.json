@@ -11,8 +11,8 @@
 			"FileDescription": "{{.Info.ProductName}}",
 			"LegalCopyright": "{{.Info.Copyright}}",
 			"ProductName": "{{.Info.ProductName}}",
-			"OriginalFilename": "Entropy.exe",
-			"InternalName": "Entropy",
+			"OriginalFilename": "Entcoin.exe",
+			"InternalName": "Entcoin",
 			"Comments": "{{.Info.Comments}}"
 		}
 	}

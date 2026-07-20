@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"entropy/internal/node"
+	"github.com/HONG-LOU/entcoin/internal/node"
 )
 
 type stringListFlag struct {
@@ -113,7 +113,7 @@ func runNode(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Entropy node running\naddress: %s\nlisten:  %s\nheight:  %d\n", dashboard.Address, dashboard.ListenAddress, dashboard.Height)
+	fmt.Printf("Entcoin node running\naddress: %s\nlisten:  %s\nheight:  %d\n", dashboard.Address, dashboard.ListenAddress, dashboard.Height)
 	<-ctx.Done()
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -245,9 +245,9 @@ func backupWallet(arguments []string) error {
 	if *output == "" {
 		return fmt.Errorf("--output is required")
 	}
-	password := os.Getenv("ENTROPY_WALLET_PASSWORD")
+	password := os.Getenv("ENTCOIN_WALLET_PASSWORD")
 	if password == "" {
-		return fmt.Errorf("ENTROPY_WALLET_PASSWORD is required")
+		return fmt.Errorf("ENTCOIN_WALLET_PASSWORD is required")
 	}
 	service, err := node.New(node.Config{DataDirectory: *data, ListenAddress: "127.0.0.1:0"})
 	if err != nil {
@@ -267,13 +267,13 @@ func migrateWallet(arguments []string) error {
 	if *output == "" {
 		return fmt.Errorf("--output is required")
 	}
-	password := os.Getenv("ENTROPY_WALLET_PASSWORD")
+	password := os.Getenv("ENTCOIN_WALLET_PASSWORD")
 	if password == "" {
-		return fmt.Errorf("ENTROPY_WALLET_PASSWORD is required")
+		return fmt.Errorf("ENTCOIN_WALLET_PASSWORD is required")
 	}
 	return node.MigrateLegacyWallet(*data, *output, password)
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: entropy <node|status|mine-one|history|wallet-backup|wallet-migrate> [options]")
+	fmt.Fprintln(os.Stderr, "usage: entcoin <node|status|mine-one|history|wallet-backup|wallet-migrate> [options]")
 }

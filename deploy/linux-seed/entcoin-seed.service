@@ -1,0 +1,45 @@
+[Unit]
+Description=Entcoin mainnet archive seed
+Documentation=https://entcoin.xyz
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=entcoin
+Group=entcoin
+WorkingDirectory=/var/lib/entcoin
+ExecStart=/opt/entcoin/entcoin-cli node --seed-mode --data /var/lib/entcoin/mainnet-v1 --listen 127.0.0.1:47821 --prune-depth 0 --no-discovery --trust-loopback-proxy
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+UMask=0077
+StateDirectory=entcoin
+StateDirectoryMode=0700
+RuntimeDirectory=entcoin
+RuntimeDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/entcoin
+MemoryHigh=384M
+MemoryMax=512M
+CPUQuota=75%
+TasksMax=128
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

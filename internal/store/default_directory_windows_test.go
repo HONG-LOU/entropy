@@ -15,7 +15,7 @@ func TestDefaultDirectoryAlwaysUsesIsolatedMainnetDirectory(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", localBase)
 	t.Setenv("APPDATA", roamingBase)
 
-	wantLocal := filepath.Join(localBase, "Entropy", "mainnet-v1")
+	wantLocal := filepath.Join(localBase, "Entcoin", "mainnet-v1")
 	directory, err := DefaultDirectory()
 	if err != nil || directory != wantLocal {
 		t.Fatalf("clean default directory = %q, err %v, want %q", directory, err, wantLocal)
@@ -41,5 +41,13 @@ func TestDefaultDirectoryAlwaysUsesIsolatedMainnetDirectory(t *testing.T) {
 	directory, err = DefaultDirectory()
 	if err != nil || directory != wantLocal {
 		t.Fatalf("current default directory = %q, err %v, want %q", directory, err, wantLocal)
+	}
+	legacyMainnet := filepath.Join(oldLocal, "mainnet-v1")
+	if err := os.MkdirAll(legacyMainnet, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	directory, err = DefaultDirectory()
+	if err != nil || directory != legacyMainnet {
+		t.Fatalf("legacy mainnet directory = %q, err %v, want %q", directory, err, legacyMainnet)
 	}
 }

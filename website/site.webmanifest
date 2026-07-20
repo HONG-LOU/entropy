@@ -1,0 +1,16 @@
+{
+  "name": "Entcoin",
+  "short_name": "Entcoin",
+  "description": "A compact, independent proof-of-work network.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f12",
+  "theme_color": "#54e6b0",
+  "icons": [
+    {
+      "src": "/assets/appicon.png?v=1.0.5",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

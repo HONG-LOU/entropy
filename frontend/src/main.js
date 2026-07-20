@@ -22,6 +22,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  ReceiptText,
   RotateCcw,
   Save,
   Send,
@@ -63,6 +64,7 @@ const appIcons = {
   Play,
   Plus,
   RefreshCw,
+  ReceiptText,
   RotateCcw,
   Save,
   Send,
@@ -103,7 +105,7 @@ function backend() {
 
 async function invoke(method, ...args) {
   const api = backend();
-  if (!api?.[method]) throw new Error(`Entropy desktop backend does not expose ${method}`);
+  if (!api?.[method]) throw new Error(`Entcoin desktop backend does not expose ${method}`);
   return api[method](...args);
 }
 
@@ -521,6 +523,16 @@ function renderHistory(transactions) {
 
   for (const transaction of transactions) {
     const row = body.insertRow();
+    row.className = "transaction-row";
+    row.tabIndex = 0;
+    row.title = "Open transaction details";
+    row.addEventListener("click", () => openTransactionDetails(transaction));
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openTransactionDetails(transaction);
+      }
+    });
     row.insertCell().textContent = formatTimestamp(transaction.timestamp);
 
     const identityCell = row.insertCell();
@@ -577,6 +589,103 @@ async function refreshDashboard() {
   } finally {
     state.dashboardRefreshing = false;
   }
+}
+
+function detailValue(label, value, asCode = false) {
+  const wrapper = document.createElement("div");
+  const term = document.createElement("dt");
+  const detail = document.createElement("dd");
+  term.textContent = label;
+  if (asCode) {
+    const code = document.createElement("code");
+    code.textContent = String(value);
+    detail.append(code);
+  } else {
+    detail.textContent = String(value);
+  }
+  wrapper.append(term, detail);
+  return wrapper;
+}
+
+function transactionStatus(transaction) {
+  if (transaction.pending) return "Pending in local pool";
+  const confirmations = asNumber(transaction.confirmations);
+  return `${confirmations.toLocaleString()} confirmation${confirmations === 1 ? "" : "s"}`;
+}
+
+function transactionEntries(title, entries, format, asCode, emptyMessage) {
+  const section = document.createElement("section");
+  const heading = document.createElement("h3");
+  heading.textContent = `${title} (${entries.length.toLocaleString()})`;
+  const list = document.createElement("ol");
+  if (entries.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = emptyMessage;
+    list.append(item);
+  } else {
+    for (const entry of entries) {
+      const item = document.createElement("li");
+      const values = format(entry);
+      if (asCode) {
+        const code = document.createElement("code");
+        code.textContent = values[0];
+        item.append(code);
+      } else {
+        const amount = document.createElement("strong");
+        const address = document.createElement("code");
+        amount.textContent = values[0];
+        address.textContent = values[1];
+        item.append(amount, address);
+      }
+      list.append(item);
+    }
+  }
+  section.append(heading, list);
+  return section;
+}
+
+function openTransactionDetails(transaction) {
+  const content = $("transaction-detail");
+  content.replaceChildren();
+  const overview = document.createElement("dl");
+  overview.className = "transaction-overview";
+  overview.append(
+    detailValue("Transaction ID", transaction.id || "Unavailable", true),
+    detailValue("Status", transactionStatus(transaction)),
+    detailValue("Type", transactionType(transaction).label),
+    detailValue("Time", formatTimestamp(transaction.timestamp)),
+    detailValue("Received", `${formatAmount(transaction.received || "0")} ENT`),
+    detailValue("Sent", `${formatAmount(transaction.sent || "0")} ENT`),
+  );
+  if (transaction.block_height != null) {
+    overview.append(
+      detailValue("Block height", `#${asNumber(transaction.block_height).toLocaleString()}`),
+      detailValue("Block hash", transaction.block_hash || "Unavailable", true),
+      detailValue("Position", asNumber(transaction.block_position).toLocaleString()),
+    );
+  }
+  if (transaction.pruned) overview.append(detailValue("Body", "Pruned locally; indexed wallet totals remain available"));
+  content.append(overview);
+
+  const lists = document.createElement("div");
+  lists.className = "transaction-io-grid";
+  const bodyUnavailable = "Transaction body is unavailable";
+  lists.append(transactionEntries(
+    "Inputs",
+    asArray(transaction.inputs),
+    (input) => [`${input.transaction_id}:${input.output_index}`],
+    true,
+    transaction.pruned ? bodyUnavailable : transaction.coinbase ? "Coinbase has no inputs" : "No inputs",
+  ));
+  lists.append(transactionEntries(
+    "Outputs",
+    asArray(transaction.outputs),
+    (output) => [`${formatAmount(output.amount)} ENT`, output.address],
+    false,
+    transaction.pruned ? bodyUnavailable : "No outputs",
+  ));
+  content.append(lists);
+  openDialog("transaction-dialog");
 }
 
 async function refreshHistory(force = false) {

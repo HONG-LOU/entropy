@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 var (

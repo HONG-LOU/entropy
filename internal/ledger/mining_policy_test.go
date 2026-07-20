@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestMiningCandidatePrioritizesHigherFeeRate(t *testing.T) {

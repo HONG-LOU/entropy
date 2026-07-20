@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 const (

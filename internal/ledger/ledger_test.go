@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestLedgerLifecycleReorgAndImport(t *testing.T) {

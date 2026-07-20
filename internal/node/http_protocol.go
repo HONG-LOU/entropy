@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 )
 
 const (
@@ -47,7 +47,7 @@ type resyncPause struct {
 
 const resyncCandidateBackoff = 30 * time.Minute
 
-const entropyClientIPHeader = "X-Entropy-Client-IP"
+const entcoinClientIPHeader = "X-Entcoin-Client-IP"
 
 type clientIPContextKey struct{}
 
@@ -362,7 +362,7 @@ func (s *Service) backgroundContext() context.Context {
 
 func validateRemoteStatus(status protocolStatus) error {
 	if status.Protocol != ledger.ProtocolName || status.Name != core.ChainName || status.Symbol != core.ChainSymbol {
-		return fmt.Errorf("peer uses an incompatible Entropy protocol")
+		return fmt.Errorf("peer uses an incompatible Entcoin protocol")
 	}
 	decodedHash, err := hex.DecodeString(status.TipHash)
 	if err != nil || len(decodedHash) != 32 {
@@ -664,7 +664,7 @@ func (s *Service) requestClientIP(request *http.Request) (string, error) {
 	if !s.trustLoopbackProxy || !remote.IsLoopback() {
 		return remote.String(), nil
 	}
-	values := request.Header.Values(entropyClientIPHeader)
+	values := request.Header.Values(entcoinClientIPHeader)
 	if len(values) == 0 {
 		return remote.String(), nil
 	}

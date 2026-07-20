@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
-	"entropy/internal/store"
-	"entropy/internal/vault"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/store"
+	"github.com/HONG-LOU/entcoin/internal/vault"
 )
 
 const DefaultListenAddress = "0.0.0.0:47821"
@@ -155,14 +155,30 @@ type PeerSummary struct {
 }
 
 type TransactionSummary struct {
-	ID            string  `json:"id"`
-	BlockHeight   *uint64 `json:"block_height,omitempty"`
-	Pending       bool    `json:"pending"`
-	Coinbase      bool    `json:"coinbase"`
-	Confirmations uint64  `json:"confirmations"`
-	Timestamp     int64   `json:"timestamp"`
-	Received      string  `json:"received"`
-	Sent          string  `json:"sent"`
+	ID            string                     `json:"id"`
+	BlockHeight   *uint64                    `json:"block_height,omitempty"`
+	BlockHash     string                     `json:"block_hash,omitempty"`
+	BlockPosition *int                       `json:"block_position,omitempty"`
+	Pending       bool                       `json:"pending"`
+	Coinbase      bool                       `json:"coinbase"`
+	Pruned        bool                       `json:"pruned"`
+	Confirmations uint64                     `json:"confirmations"`
+	Timestamp     int64                      `json:"timestamp"`
+	Received      string                     `json:"received"`
+	Sent          string                     `json:"sent"`
+	Inputs        []TransactionInputSummary  `json:"inputs"`
+	Outputs       []TransactionOutputSummary `json:"outputs"`
+}
+
+type TransactionInputSummary struct {
+	TransactionID string `json:"transaction_id"`
+	OutputIndex   uint32 `json:"output_index"`
+}
+
+type TransactionOutputSummary struct {
+	Index   uint32 `json:"index"`
+	Address string `json:"address"`
+	Amount  string `json:"amount"`
 }
 
 func New(config Config) (*Service, error) {
@@ -650,7 +666,7 @@ func (s *Service) Dashboard() (Dashboard, error) {
 		}
 	}
 	return Dashboard{
-		Name:                core.ChainName,
+		Name:                core.ProductName,
 		Symbol:              core.ChainSymbol,
 		Protocol:            ledger.ProtocolName,
 		Address:             address,
@@ -1024,15 +1040,35 @@ func (s *Service) TransactionHistory(limit int) ([]TransactionSummary, error) {
 	}
 	result := make([]TransactionSummary, 0, len(records))
 	for _, record := range records {
+		inputs := make([]TransactionInputSummary, 0, len(record.Transaction.Inputs))
+		for _, input := range record.Transaction.Inputs {
+			inputs = append(inputs, TransactionInputSummary{TransactionID: input.TxID, OutputIndex: input.OutputIndex})
+		}
+		outputs := make([]TransactionOutputSummary, 0, len(record.Transaction.Outputs))
+		for index, output := range record.Transaction.Outputs {
+			outputs = append(outputs, TransactionOutputSummary{
+				Index: uint32(index), Address: output.Address, Amount: core.FormatAmount(output.Amount),
+			})
+		}
+		var blockPosition *int
+		if record.BlockHeight != nil {
+			position := record.Position
+			blockPosition = &position
+		}
 		result = append(result, TransactionSummary{
 			ID:            record.ID,
 			BlockHeight:   record.BlockHeight,
+			BlockHash:     record.BlockHash,
+			BlockPosition: blockPosition,
 			Pending:       record.Pending,
 			Coinbase:      record.Coinbase,
+			Pruned:        record.Pruned,
 			Confirmations: record.Confirmations,
 			Timestamp:     record.Timestamp,
 			Received:      core.FormatAmount(record.Received),
 			Sent:          core.FormatAmount(record.Sent),
+			Inputs:        inputs,
+			Outputs:       outputs,
 		})
 	}
 	return result, nil

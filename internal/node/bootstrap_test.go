@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 )
 
 func TestFetchBootstrapManifestValidatesAndNormalizesPeers(t *testing.T) {

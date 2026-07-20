@@ -1,21 +1,21 @@
-# Entropy (ENT)
+# Entcoin (ENT)
 
-Entropy v1.0.4 is a compact proof-of-work mainnet packaged as a Windows and
+Entcoin v1.0.5 is a compact proof-of-work mainnet packaged as a Windows and
 Ubuntu desktop full node. Starting one application starts the wallet, SQLite
 ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
 database server, browser tab, or background daemon.
 
 > `entropy-mainnet-v1` is a genesis and consensus compatibility identifier, not
-> an audit or production-security claim. Entropy has not received an independent
+> an audit or production-security claim. Entcoin has not received an independent
 > security or consensus audit. ENT must not be bought, sold, redeemed, or used
 > to carry real-world value unless and until appropriate independent audits
 > establish a suitable security basis.
 
 The source repository is public and MIT-licensed:
-<https://github.com/HONG-LOU/entropy>.
+<https://github.com/HONG-LOU/entcoin>.
 
-## What v1.0.4 includes
+## What v1.0.5 includes
 
 - A Wails desktop node with send, receive, automatic minimum fees, mining,
   network health, history, wallet recovery, database, and pruning controls.
@@ -69,15 +69,17 @@ the older v0.2 release assets for `entropy-mainnet-v1`. The portable build is
 produced locally at:
 
 ```text
-D:\Entropy\build\bin\Entropy.exe
+D:\Entcoin\build\bin\Entcoin.exe
 ```
 
 The NSIS build is the `*installer*.exe` artifact in the same directory. The
 installer is the simplest distribution for other Windows users; the portable
 EXE can be launched directly. Windows 10/11 x64 and Microsoft WebView2 Runtime
 are required. The installer build downloads the WebView2 bootstrapper when
-needed. Releases are currently unsigned, so Windows SmartScreen may show an
-unknown-publisher warning.
+needed. The current v1.0.5 release is unsigned, so Windows SmartScreen may show
+an unknown-publisher warning. The build signs and timestamps the portable
+application, installer, and CLI before checksums are generated when a trusted
+Authenticode certificate is configured.
 
 On first launch the application:
 
@@ -94,14 +96,15 @@ node; mining begins only after **Start mining** or **Mine one block**.
 The mainnet data directory for a clean installation is:
 
 ```text
-%LOCALAPPDATA%\Entropy\mainnet-v1
+%LOCALAPPDATA%\Entcoin\mainnet-v1
 ```
 
 The per-user uninstaller removes the application but deliberately keeps this
 directory, including the wallet and chain. Back it up before deleting it
 manually. Historical `%APPDATA%\Entropy` and `%LOCALAPPDATA%\Entropy` testnet
-state is never selected as mainnet state. Do not copy a testnet database or
-chain file into `mainnet-v1`.
+state is never selected as mainnet state. Existing Entropy mainnet directories
+are detected and reused so the rename cannot hide a wallet. Do not copy a
+testnet database or chain file into `mainnet-v1`.
 
 A new desktop ledger starts in pruned mode retaining the newest 20,000 complete
 block bodies. Later launches respect the storage policy persisted in that
@@ -116,7 +119,7 @@ The Wallet view can keep multiple local wallets. Creating or importing another
 wallet preserves the current profile and activates the selected one without
 duplicating or resynchronizing the chain database. A wallet cannot be switched
 away from until its recovery is confirmed, and an active or unsecured wallet
-cannot be removed. Entropy has no hosted wallet account or server login;
+cannot be removed. Entcoin has no hosted wallet account or server login;
 restoring a phrase or `.entwallet` is how the same wallet is opened on another
 computer.
 
@@ -128,20 +131,20 @@ setup, backups, migration, pruning, and troubleshooting.
 Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
 
 ```bash
-sudo apt install ./entropy_1.0.4_amd64.deb
-entropy
+sudo apt install ./entcoin_1.0.5_amd64.deb
+entcoin
 ```
 
-The package installs a normal desktop-menu entry plus `entropy-cli`. The wallet
+The package installs a normal desktop-menu entry plus `entcoin-cli`. The wallet
 master key is stored in the logged-in user's Secret Service keyring and the
 authenticated ciphertext remains at
-`~/.config/Entropy/mainnet-v1/wallet.vault`. A standard Ubuntu Desktop login
+`~/.config/Entcoin/mainnet-v1/wallet.vault`. A standard Ubuntu Desktop login
 starts and unlocks this service. A locked, missing, or inaccessible keyring
 causes startup to fail closed instead of creating a replacement wallet.
 
 Windows DPAPI and Linux Secret Service vault files are intentionally not
 portable. Move the same address between systems by restoring its 24-word
-Entropy phrase or verified `.entwallet` backup. Consensus, addresses, balances,
+Entcoin phrase or verified `.entwallet` backup. Consensus, addresses, balances,
 mining, and peer synchronization are identical on both platforms.
 
 ## Transfer and confirmation speed
@@ -163,7 +166,7 @@ confirmations do not provide Bitcoin-level economic security.
 
 ## Monetary and consensus parameters
 
-Entropy has no premine. Height zero is a fixed reward-free genesis block.
+Entcoin has no premine. Height zero is a fixed reward-free genesis block.
 Amounts use eight decimal places and integer arithmetic.
 
 ```text
@@ -194,21 +197,21 @@ cannot be spent through height 100 and becomes spendable at height 101.
 Build the headless executable or use `go run`:
 
 ```powershell
-go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
+go build -o .\build\bin\entcoin-cli.exe .\cmd\entcoin
 
 # Archive node, automatic LAN discovery enabled
-.\build\bin\entropy-cli.exe node --data .\data\node-a --listen 0.0.0.0:47821 --mine
+.\build\bin\entcoin-cli.exe node --data .\data\node-a --listen 0.0.0.0:47821 --mine
 
 # Second node on the same computer
-.\build\bin\entropy-cli.exe node --data .\data\node-b --listen 127.0.0.1:47822 `
+.\build\bin\entcoin-cli.exe node --data .\data\node-b --listen 127.0.0.1:47822 `
   --peer http://127.0.0.1:47821
 
 # Pruned node retaining the newest 20,000 complete block bodies
-.\build\bin\entropy-cli.exe node --data .\data\node-c --listen 0.0.0.0:47823 `
+.\build\bin\entcoin-cli.exe node --data .\data\node-c --listen 0.0.0.0:47823 `
   --peer http://127.0.0.1:47821 --prune-depth 20000
 
 # Public archive relay behind a local HTTPS/WSS reverse proxy
-.\build\bin\entropy-cli.exe node --seed-mode --data .\data\seed `
+.\build\bin\entcoin-cli.exe node --seed-mode --data .\data\seed `
   --listen 127.0.0.1:47821 --prune-depth 0 --no-discovery `
   --trust-loopback-proxy
 ```
@@ -252,7 +255,7 @@ new internet-connected nodes can discover the network without manual peer
 configuration. An empty or unreachable manifest is reported but does not
 prevent local startup.
 
-The release includes `entropy-windows-seed-deploy.zip`; see
+The release includes `entcoin-windows-seed-deploy.zip`; see
 [Public seed deployment](docs/public-seed.md). The seed package runs an archive
 node behind a Caddy HTTPS/WSS reverse proxy on TCP 443. Direct desktop P2P is
 plain HTTP/WebSocket, has no peer authentication, and does not automatically
@@ -289,7 +292,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.4 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.0.5 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -306,7 +309,7 @@ also needs WebView2 and NSIS. Ubuntu 24.04 packaging needs `libgtk-3-dev`,
 standard-library security fixes used by the public network stack.
 
 ```powershell
-cd D:\Entropy
+cd D:\Entcoin
 go test ./...
 go vet ./...
 npm --prefix frontend ci
@@ -320,24 +323,28 @@ Create the portable EXE, NSIS installer, CLI, public-seed deployment ZIP, and
 .\scripts\build.ps1
 ```
 
-The build script runs Go tests and vet first. Current release artifacts are not
-Authenticode-signed and builds are not yet reproducible.
+The build script runs Go tests and vet first. Release CI publishes unsigned
+Windows artifacts when signing secrets are absent. To sign a later release,
+configure `ENTCOIN_WINDOWS_CERTIFICATE_BASE64` and
+`ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD` with a CA-issued OV or EV certificate.
+EV certificates usually establish SmartScreen reputation fastest; new OV
+certificates can still need time to accumulate reputation. Builds are not yet
+reproducible.
 
 On Ubuntu 24.04:
 
 ```bash
-./scripts/build-linux.sh 1.0.4
+./scripts/build-linux.sh 1.0.5
 ```
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Node operations and wallet recovery](docs/operations.md)
-- [Lightweight mainnet maturity roadmap](docs/maturity-roadmap.md)
+- [Next steps](docs/next-step.md)
 - [Mainnet protocol](docs/protocol.md)
 - [Public seed deployment](docs/public-seed.md)
-- [Roadmap](docs/roadmap.md)
 - [Security policy and boundaries](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 
-Entropy is licensed under the [MIT License](LICENSE).
+Entcoin is licensed under the [MIT License](LICENSE).

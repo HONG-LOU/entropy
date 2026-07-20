@@ -9,13 +9,13 @@ try {
     Assert-SeedEnvironment -Values $config
     Set-SeedProcessEnvironment -Values $config
 
-    $installDirectory = [string]$config["ENTROPY_INSTALL_DIR"]
+    $installDirectory = [string]$config["ENTCOIN_INSTALL_DIR"]
     $executable = Join-Path $installDirectory "caddy.exe"
     $caddyfile = Join-Path $installDirectory "Caddyfile"
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
         throw "Caddy is missing at $executable"
     }
-    $logDirectory = [string]$config["ENTROPY_LOG_DIR"]
+    $logDirectory = [string]$config["ENTCOIN_LOG_DIR"]
     New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
     Get-ChildItem -LiteralPath $logDirectory -Filter "caddy-console-*.log" -File -ErrorAction SilentlyContinue |
         Where-Object LastWriteTime -lt (Get-Date).AddDays(-30) |

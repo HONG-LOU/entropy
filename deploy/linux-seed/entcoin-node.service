@@ -1,0 +1,29 @@
+[Unit]
+Description=Entcoin public archive seed node
+Documentation=https://entcoin.xyz
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=entcoin
+Group=entcoin
+UMask=0077
+ExecStart=/usr/local/bin/entcoin-cli node --seed-mode --data /var/lib/entcoin --listen 127.0.0.1:47821 --prune-depth 0 --no-discovery --trust-loopback-proxy --peer https://template-chat.xyz
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/entcoin
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
-# Entropy node operations
+# Entcoin node operations
 
-This guide covers the v1.0.4 Windows/Ubuntu desktop node, headless CLI, and
+This guide covers the v1.0.5 Windows/Ubuntu desktop node, headless CLI, and
 optional public-seed deployment. The network identity is
 `entropy-mainnet-v1`, but that is a compatibility label rather than an audit or
 production-safety claim. ENT must not carry real-world value without
@@ -10,35 +10,36 @@ appropriate independent audits.
 
 Release builds provide these Windows artifacts:
 
-- `Entropy.exe`: portable Wails desktop application;
+- `Entcoin.exe`: portable Wails desktop application;
 - `*installer*.exe`: NSIS per-user installer;
-- `entropy-cli.exe`: headless node and wallet utility;
-- `entropy-windows-seed-deploy.zip`: archive-seed deployment package.
+- `entcoin-cli.exe`: headless node and wallet utility;
+- `entcoin-windows-seed-deploy.zip`: archive-seed deployment package.
 
 Ubuntu 24.04+ amd64 releases additionally provide:
 
-- `entropy_1.0.4_amd64.deb`: desktop application and CLI installer;
-- `entropy-linux-amd64`: unpackaged desktop binary;
-- `entropy-cli-linux-amd64`: unpackaged headless node;
+- `entcoin_1.0.5_amd64.deb`: desktop application and CLI installer;
+- `entcoin-linux-amd64`: unpackaged desktop binary;
+- `entcoin-cli-linux-amd64`: unpackaged headless node;
 - `SHA256SUMS-linux.txt`: Linux artifact checksums.
 
 Verify Windows artifacts against `SHA256SUMS.txt` and Linux artifacts against
 `SHA256SUMS-linux.txt` from the same release before running them. Current
-binaries are not code-signed, so a checksum proves only that the file matches
+v1.0.5 binaries are not code-signed, so a checksum proves only that the file matches
 the published release artifact, not that a trusted certificate authority
 verified its publisher.
 
 Double-click the installed shortcut or portable EXE. A clean first launch
 creates the wallet and SQLite ledger under
-`%LOCALAPPDATA%\Entropy\mainnet-v1`, starts the TCP listener, loads the built-in
+`%LOCALAPPDATA%\Entcoin\mainnet-v1`, starts the TCP listener, loads the built-in
 HTTPS bootstrap manifests, and searches the LAN for peers. It is immediately a
 full validating and relaying node; mining remains off until explicitly enabled.
 The fresh desktop ledger retains the newest 20,000 complete block bodies. Later
 launches respect the storage mode already persisted in the database.
 
 Historical testnet state under `%APPDATA%\Entropy` or
-`%LOCALAPPDATA%\Entropy` is never reused as mainnet state. Testnet chains and
-databases must stay outside `mainnet-v1`.
+`%LOCALAPPDATA%\Entropy` is never reused as mainnet state. Existing Entropy
+mainnet directories are detected and reused so the rename cannot hide a
+wallet. Testnet chains and databases must stay outside `mainnet-v1`.
 
 The desktop prefers TCP `47821`. If another process already owns that port it
 starts on a free dynamic port instead and shows the actual listener plus a
@@ -48,22 +49,22 @@ strict `--listen` behavior so operator mistakes fail visibly.
 Microsoft WebView2 Runtime is required. It is normally present on current
 Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 
-Install Ubuntu packages with `sudo apt install ./entropy_1.0.4_amd64.deb`, then
-launch **Entropy** from the desktop menu or run `entropy`. Ubuntu stores mainnet
-state under `~/.config/Entropy/mainnet-v1`. The logged-in desktop session must
+Install Ubuntu packages with `sudo apt install ./entcoin_1.0.5_amd64.deb`, then
+launch **Entcoin** from the desktop menu or run `entcoin`. Ubuntu stores mainnet
+state under `~/.config/Entcoin/mainnet-v1`. The logged-in desktop session must
 provide an unlocked Secret Service keyring; the standard Ubuntu Desktop session
 does so automatically.
 
 ## Uninstall and retained data
 
 The NSIS uninstaller removes the installed application and shortcuts. It does
-not delete `%LOCALAPPDATA%\Entropy\mainnet-v1`; wallet keys, the recovery
+not delete `%LOCALAPPDATA%\Entcoin\mainnet-v1`; wallet keys, the recovery
 marker, peer records, and the chain database remain available for a later
 reinstall. Remove active data manually only after confirming that the recovery
 phrase or a portable `.entwallet` backup works.
 
-On Ubuntu, `sudo apt remove entropy` removes the application and menu entry but
-retains `~/.config/Entropy/mainnet-v1` and the Secret Service key. Confirm the
+On Ubuntu, `sudo apt remove entcoin` removes the application and menu entry but
+retains `~/.config/Entcoin/mainnet-v1` and the Secret Service key. Confirm the
 recovery phrase or portable backup before deleting either one.
 
 Do not configure profile replication for the live mainnet directory. Copying
@@ -83,9 +84,9 @@ Use separate data directories and TCP ports. Never point two processes at the
 same data directory.
 
 ```powershell
-go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
+go build -o .\build\bin\entcoin-cli.exe .\cmd\entcoin
 
-.\build\bin\entropy-cli.exe node `
+.\build\bin\entcoin-cli.exe node `
   --data .\data\node-a `
   --listen 127.0.0.1:47821 `
   --mine `
@@ -95,7 +96,7 @@ go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
 In another terminal:
 
 ```powershell
-.\build\bin\entropy-cli.exe node `
+.\build\bin\entcoin-cli.exe node `
   --data .\data\node-b `
   --listen 127.0.0.1:47822 `
   --peer http://127.0.0.1:47821 `
@@ -137,7 +138,7 @@ blocks, transactions, signatures, proof of work, and monetary rules. It also
 relays to its established outbound peers. It simply cannot accept a new inbound
 connection initiated from the internet.
 
-The release's `entropy-windows-seed-deploy.zip` can install an always-on archive
+The release's `entcoin-windows-seed-deploy.zip` can install an always-on archive
 node behind Caddy on HTTPS/WSS port 443. Its archive policy is intentional: a
 new peer cannot synchronize from genesis through a pruned seed. Follow
 [the public-seed guide](public-seed.md), verify the endpoint externally, and
@@ -170,7 +171,7 @@ The two default ports have different purposes:
 To make a home node publicly reachable:
 
 1. Give the computer a stable LAN address or DHCP reservation.
-2. Allow inbound TCP `47821` for Entropy in Windows Defender Firewall.
+2. Allow inbound TCP `47821` for Entcoin in Windows Defender Firewall.
 3. Forward router TCP `47821` to that computer's TCP `47821`.
 4. Test from a different internet connection, not from the same LAN.
 5. Give peers `http://<public-ip-or-dns>:47821`.
@@ -206,17 +207,17 @@ listener directly.
 Build once:
 
 ```powershell
-go build -o .\build\bin\entropy-cli.exe .\cmd\entropy
+go build -o .\build\bin\entcoin-cli.exe .\cmd\entcoin
 ```
 
 Each command accepts `--data <directory>`. When omitted, Windows uses
-`%LOCALAPPDATA%\Entropy\mainnet-v1`. Each data directory has an exclusive lock,
+`%LOCALAPPDATA%\Entcoin\mainnet-v1`. Each data directory has an exclusive lock,
 so stop the desktop app or existing CLI node before opening the same directory.
 
 ### `node`
 
 ```text
-entropy-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
+entcoin-cli node [--data DIR] [--listen HOST:PORT] [--peer URL]
                  [--mine] [--seed-mode] [--prune-depth BLOCKS] [--no-discovery]
                  [--bootstrap-manifest HTTPS_URL] [--no-bootstrap]
                  [--trust-loopback-proxy]
@@ -244,7 +245,7 @@ wallets.
 ### `status`
 
 ```powershell
-.\build\bin\entropy-cli.exe status --data .\data\node-a
+.\build\bin\entcoin-cli.exe status --data .\data\node-a
 ```
 
 Prints address, confirmed balance, height, pending count, peers, and issued
@@ -254,7 +255,7 @@ running node.
 ### `mine-one`
 
 ```powershell
-.\build\bin\entropy-cli.exe mine-one --data .\data\node-a
+.\build\bin\entcoin-cli.exe mine-one --data .\data\node-a
 ```
 
 Builds one candidate, searches proof of work, commits through normal consensus
@@ -263,7 +264,7 @@ validation, prints the block height/hash, and exits.
 ### `history`
 
 ```powershell
-.\build\bin\entropy-cli.exe history --data .\data\node-a --limit 50
+.\build\bin\entcoin-cli.exe history --data .\data\node-a --limit 50
 ```
 
 Prints pending and confirmed wallet transactions with received/sent amounts and
@@ -271,15 +272,15 @@ confirmation counts.
 
 ### `wallet-backup`
 
-The backup password is read from `ENTROPY_WALLET_PASSWORD` so it does not appear
+The backup password is read from `ENTCOIN_WALLET_PASSWORD` so it does not appear
 as a command-line argument. Passwords must contain 12 to 1024 UTF-8 bytes.
 
 ```powershell
-$env:ENTROPY_WALLET_PASSWORD = Read-Host "Backup password"
-.\build\bin\entropy-cli.exe wallet-backup `
+$env:ENTCOIN_WALLET_PASSWORD = Read-Host "Backup password"
+.\build\bin\entcoin-cli.exe wallet-backup `
   --data .\data\node-a `
-  --output E:\Backups\entropy-wallet.entwallet
-Remove-Item Env:\ENTROPY_WALLET_PASSWORD
+  --output E:\Backups\entcoin-wallet.entwallet
+Remove-Item Env:\ENTCOIN_WALLET_PASSWORD
 ```
 
 The command appends `.entwallet` when the destination has another extension.
@@ -291,15 +292,15 @@ Use this only to convert a v0.1 plaintext `wallet.json` in a copied historical
 data directory into a portable encrypted backup:
 
 ```powershell
-$env:ENTROPY_WALLET_PASSWORD = Read-Host "Backup password"
-.\build\bin\entropy-cli.exe wallet-migrate `
-  --data D:\Backups\entropy-testnet-v01 `
-  --output E:\Backups\entropy-legacy-wallet.entwallet
-Remove-Item Env:\ENTROPY_WALLET_PASSWORD
+$env:ENTCOIN_WALLET_PASSWORD = Read-Host "Backup password"
+.\build\bin\entcoin-cli.exe wallet-migrate `
+  --data D:\Backups\entcoin-testnet-v01 `
+  --output E:\Backups\entcoin-legacy-wallet.entwallet
+Remove-Item Env:\ENTCOIN_WALLET_PASSWORD
 ```
 
 The migration preserves the old P-256 key and address but does not migrate its
-testnet chain. There is intentionally no CLI restore command in v1.0.4; start
+testnet chain. There is intentionally no CLI restore command in v1.0.5; start
 the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
@@ -307,7 +308,7 @@ the mainnet desktop app and restore the backup from the Wallet view.
 The default Windows layout is:
 
 ```text
-%LOCALAPPDATA%\Entropy\mainnet-v1\
+%LOCALAPPDATA%\Entcoin\mainnet-v1\
   entropy.db                       SQLite ledger and indexes
   entropy.db-wal                   live WAL, normally checkpointed on shutdown
   entropy.db-shm                   live SQLite shared-memory file
@@ -333,7 +334,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v1.0.4 wallet
+### New v1.0.5 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -342,7 +343,7 @@ while the node is live can omit committed data still present in its WAL.
 4. Also export a `.entwallet` file with a long, unique password.
 5. Store the phrase, backup file, and backup password in separate locations.
 
-The BIP39 words use an Entropy-specific P-256 derivation and an empty BIP39
+The BIP39 words use an Entcoin-specific P-256 derivation and an empty BIP39
 passphrase. Generic Bitcoin or Ethereum wallets will not derive this address.
 
 ### Local operating-system vault
@@ -396,13 +397,13 @@ The current wallet must have a confirmed phrase or encrypted backup before the
 application permits switching away. Only a non-active, recovery-confirmed
 profile can be removed. Removal deletes its local OS-protected vault, not its
 on-chain history; the phrase or `.entwallet` remains sufficient to add it back.
-Entropy has no hosted account login or password-reset service.
+Entcoin has no hosted account login or password-reset service.
 
 ## Recover a wallet from a testnet release
 
 Before leaving v0.1 or v0.2, stop it and copy the whole old data directory to
 offline storage. Never place its `chain.json`, `entropy.db`, WAL, mempool, or
-peer files under `%LOCALAPPDATA%\Entropy\mainnet-v1`. Mainnet has a different
+peer files under `%LOCALAPPDATA%\Entcoin\mainnet-v1`. Mainnet has a different
 genesis and rejects testnet protocol state rather than importing or replaying
 it.
 
@@ -411,7 +412,7 @@ For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
 copy of the old directory; the command validates the key and creates verified
 local OS protection and portable encrypted copies before removing plaintext.
 
-Then start v1.0.4 normally and restore the phrase or `.entwallet` from the
+Then start v1.0.5 normally and restore the phrase or `.entwallet` from the
 desktop Wallet view. This recovers only the P-256 key and address. Mainnet
 balances, spendable outputs, confirmations, and history are derived solely from
 the mainnet chain and begin independently of every testnet balance.
@@ -434,7 +435,7 @@ The desktop **Database** panel previews the irreversible cutoff before applying
 pruning. The equivalent CLI startup policy is:
 
 ```powershell
-.\build\bin\entropy-cli.exe node --prune-depth 20000
+.\build\bin\entcoin-cli.exe node --prune-depth 20000
 ```
 
 Set `--prune-depth 0` explicitly to stop future pruning. This changes policy

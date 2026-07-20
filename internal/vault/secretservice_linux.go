@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	secretServiceName    = "Entropy"
+	secretServiceName    = "Entcoin"
+	legacyServiceName    = "Entropy"
 	secretServiceAccount = "mainnet-v1-local-wallet-key"
 	localKeyBytes        = chacha20poly1305.KeySize
 )
@@ -95,6 +96,17 @@ func localNonce(cipher cipherDescriptor) ([]byte, error) {
 
 func secretServiceKey(create bool) ([]byte, error) {
 	encoded, err := keyring.Get(secretServiceName, secretServiceAccount)
+	if errors.Is(err, keyring.ErrNotFound) {
+		legacy, legacyErr := keyring.Get(legacyServiceName, secretServiceAccount)
+		if legacyErr == nil {
+			encoded, err = legacy, nil
+			if setErr := keyring.Set(secretServiceName, secretServiceAccount, legacy); setErr != nil {
+				return nil, fmt.Errorf("%w: migrate wallet key in Secret Service: %v", ErrLocalProtectionFailure, setErr)
+			}
+		} else if !errors.Is(legacyErr, keyring.ErrNotFound) {
+			return nil, fmt.Errorf("%w: open legacy wallet key from Secret Service: %v", ErrLocalProtectionFailure, legacyErr)
+		}
+	}
 	if errors.Is(err, keyring.ErrNotFound) && create {
 		key := make([]byte, localKeyBytes)
 		if _, randomErr := rand.Read(key); randomErr != nil {

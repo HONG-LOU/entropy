@@ -1,4 +1,4 @@
-module entropy
+module github.com/HONG-LOU/entcoin
 
 go 1.25.0
 

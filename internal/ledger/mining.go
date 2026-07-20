@@ -9,7 +9,7 @@ import (
 	"math"
 	"math/bits"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func (l *Ledger) BuildMiningCandidate(ctx context.Context, address string) (core.Block, Tip, error) {

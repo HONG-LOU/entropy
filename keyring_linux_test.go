@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"entropy/internal/vault"
+	"github.com/HONG-LOU/entcoin/internal/vault"
 )
 
 func TestMain(m *testing.M) {

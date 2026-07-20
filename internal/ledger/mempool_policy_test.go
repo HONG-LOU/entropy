@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestMempoolResourceBudgetsAndMinimumRelayFee(t *testing.T) {

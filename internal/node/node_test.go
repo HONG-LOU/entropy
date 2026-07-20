@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 
 	"github.com/gorilla/websocket"
 )
@@ -106,6 +106,22 @@ func TestTwoNodesPropagateTransactionAndBlockIncrementally(t *testing.T) {
 	if !historyContains(history, transaction.ID, false) {
 		t.Fatal("confirmed transaction was missing from wallet history")
 	}
+	for _, summary := range history {
+		if summary.ID != transaction.ID {
+			continue
+		}
+		if summary.BlockHeight == nil || summary.BlockHash == "" || summary.BlockPosition == nil || summary.Pruned {
+			t.Fatalf("confirmed transaction metadata is incomplete: %+v", summary)
+		}
+		if len(summary.Inputs) != len(transaction.Inputs) || len(summary.Outputs) != len(transaction.Outputs) {
+			t.Fatalf("transaction detail input/output count = %d/%d, want %d/%d", len(summary.Inputs), len(summary.Outputs), len(transaction.Inputs), len(transaction.Outputs))
+		}
+		if summary.Inputs[0].TransactionID != transaction.Inputs[0].TxID || summary.Outputs[0].Address != transaction.Outputs[0].Address {
+			t.Fatalf("transaction detail does not match transaction: %+v", summary)
+		}
+		return
+	}
+	t.Fatal("confirmed transaction details were missing")
 }
 
 func TestIncrementalSyncReorgChoosesStrongerFork(t *testing.T) {

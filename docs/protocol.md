@@ -1,6 +1,6 @@
-# Entropy mainnet protocol
+# Entcoin mainnet protocol
 
-This document describes the v1.0.4 implementation. The consensus/network
+This document describes the v1.0.5 implementation. The consensus/network
 identity is `entropy-mainnet-v1`. The HTTP path prefix remains `/v2` because it
 denotes the second transport design; endpoint numbering and network identity
 are not the same version counter.
@@ -74,7 +74,7 @@ the fields shown below.
 ```json
 {
   "protocol": "entropy-mainnet-v1",
-  "name": "Entropy",
+  "name": "Entcoin",
   "symbol": "ENT",
   "height": 123,
   "tip_hash": "...",
@@ -207,7 +207,7 @@ never accepts another node's serialized whole-chain/whole-mempool state.
   "listen_port": 47821,
   "status": {
     "protocol": "entropy-mainnet-v1",
-    "name": "Entropy",
+    "name": "Entcoin",
     "symbol": "ENT",
     "height": 123,
     "tip_hash": "...",

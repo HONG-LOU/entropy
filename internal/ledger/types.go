@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 const (

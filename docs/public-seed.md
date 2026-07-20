@@ -1,6 +1,6 @@
 # Public archive seed deployment
 
-This runbook deploys one Entropy archive seed behind Caddy. The packaged
+This runbook deploys one Entcoin archive seed behind Caddy. The packaged
 automation targets Windows x64; the same CLI seed mode supports a minimal Linux
 systemd deployment. The node validates and stores the chain locally. Caddy
 terminates TLS on TCP 443 and proxies HTTP plus WebSocket traffic to
@@ -20,16 +20,16 @@ internet peers
 Caddy scheduled task (LOCAL SERVICE)
     |
     | HTTP / WS 127.0.0.1:47821
-    | X-Entropy-Client-IP overwritten from the TCP client address
+    | X-Entcoin-Client-IP overwritten from the TCP client address
     v
-entropy-cli scheduled task (dedicated Windows user)
+entcoin-cli scheduled task (dedicated Windows user)
     |
     v
 archive SQLite ledger; ephemeral non-financial identity; no wallet file
 ```
 
 The node must start with loopback-proxy trust enabled. It may trust
-`X-Entropy-Client-IP` only when the immediate TCP `RemoteAddr` is loopback and
+`X-Entcoin-Client-IP` only when the immediate TCP `RemoteAddr` is loopback and
 the header is one valid IP address. Caddy overwrites that header; it never
 passes a caller-supplied value through. Do not put another proxy or CDN in front
 without defining an additional trusted-proxy boundary.
@@ -48,7 +48,7 @@ URL. Its actual listener remains `127.0.0.1:47821`, while peers must configure
 - Inbound TCP 443 permitted by the cloud security group and upstream firewall.
   TCP 80 and TCP 47821 stay closed.
 - Outbound DNS, NTP, HTTPS, and WSS access.
-- `entropy-windows-seed-deploy.zip` from an Entropy release.
+- `entcoin-windows-seed-deploy.zip` from an Entcoin release.
 - An official Caddy v2 Windows amd64 `caddy.exe`, verified against the
   publisher's checksum.
 - Storage outside the application directory for the archive database, Caddy
@@ -62,14 +62,14 @@ uses TCP 443 and does not require port 80.
 
 The release ZIP contains:
 
-- `entropy-cli.exe`;
+- `entcoin-cli.exe`;
 - `install.ps1` and `uninstall.ps1`;
 - startup runners for the node and Caddy;
 - `health-check.ps1`;
 - a strict `seed.env.example`;
 - the Caddy configuration.
 
-Caddy is intentionally not redistributed in the Entropy release. Place the
+Caddy is intentionally not redistributed in the Entcoin release. Place the
 verified `caddy.exe` beside `install.ps1`.
 
 ## Configuration
@@ -78,29 +78,29 @@ Copy `seed.env.example` to `seed.env` and replace every example value:
 
 | Variable | Contract |
 | --- | --- |
-| `ENTROPY_SEED_DOMAIN` | Public DNS hostname only, without scheme or path |
-| `ENTROPY_ACME_EMAIL` | ACME account contact |
-| `ENTROPY_INSTALL_DIR` | Installed binaries and scripts |
-| `ENTROPY_DATA_DIR` | Archive ledger only; outside install dir |
-| `ENTROPY_CADDY_DATA_DIR` | Caddy certificate state; outside install dir |
-| `ENTROPY_LOG_DIR` | Node, Caddy console, and access logs |
-| `ENTROPY_LISTEN_ADDRESS` | Must be `127.0.0.1:47821` |
-| `ENTROPY_BOOTSTRAP_PEER` | Optional explicit HTTPS peer base URL |
-| `ENTROPY_BOOTSTRAP_MANIFEST_URLS` | 1..8 comma-separated HTTPS manifest URLs |
-| `ENTROPY_PRUNE_DEPTH` | Must be `0` for an archive seed |
-| `ENTROPY_DISABLE_DISCOVERY` | Must be `true` on a public server |
-| `ENTROPY_TRUST_LOOPBACK_PROXY` | Must be `true` with the supplied Caddyfile |
+| `ENTCOIN_SEED_DOMAIN` | Public DNS hostname only, without scheme or path |
+| `ENTCOIN_ACME_EMAIL` | ACME account contact |
+| `ENTCOIN_INSTALL_DIR` | Installed binaries and scripts |
+| `ENTCOIN_DATA_DIR` | Archive ledger only; outside install dir |
+| `ENTCOIN_CADDY_DATA_DIR` | Caddy certificate state; outside install dir |
+| `ENTCOIN_LOG_DIR` | Node, Caddy console, and access logs |
+| `ENTCOIN_LISTEN_ADDRESS` | Must be `127.0.0.1:47821` |
+| `ENTCOIN_BOOTSTRAP_PEER` | Optional explicit HTTPS peer base URL |
+| `ENTCOIN_BOOTSTRAP_MANIFEST_URLS` | 1..8 comma-separated HTTPS manifest URLs |
+| `ENTCOIN_PRUNE_DEPTH` | Must be `0` for an archive seed |
+| `ENTCOIN_DISABLE_DISCOVERY` | Must be `true` on a public server |
+| `ENTCOIN_TRUST_LOOPBACK_PROXY` | Must be `true` with the supplied Caddyfile |
 
 The default manifest delivery paths are:
 
 ```text
-https://raw.githubusercontent.com/HONG-LOU/entropy/main/network/mainnet.json
-https://cdn.jsdelivr.net/gh/HONG-LOU/entropy@main/network/mainnet.json
+https://raw.githubusercontent.com/HONG-LOU/entcoin/main/network/mainnet.json
+https://cdn.jsdelivr.net/gh/HONG-LOU/entcoin@main/network/mainnet.json
 ```
 
 The runner passes both URLs to the node bootstrap subsystem. The node validates
 the bounded, versioned `entropy-mainnet-v1` document, refreshes it periodically,
-and persists accepted HTTPS peers in SQLite. `ENTROPY_BOOTSTRAP_PEER` may add
+and persists accepted HTTPS peers in SQLite. `ENTCOIN_BOOTSTRAP_PEER` may add
 one explicit peer for recovery when published manifest sources are unavailable.
 
 The equivalent CLI controls are:
@@ -119,7 +119,7 @@ Never use `--trust-loopback-proxy` when the node listens on a public interface.
 Open an elevated Windows PowerShell 5.1 session in the extracted directory:
 
 ```powershell
-$credential = Get-Credential -Message "Dedicated Entropy seed account"
+$credential = Get-Credential -Message "Dedicated Entcoin seed account"
 Set-ExecutionPolicy -Scope Process Bypass
 .\install.ps1 -NodeCredential $credential
 ```
@@ -127,10 +127,10 @@ Set-ExecutionPolicy -Scope Process Bypass
 The installer:
 
 1. validates every environment value and the Caddyfile;
-2. copies binaries and scripts to `ENTROPY_INSTALL_DIR`;
+2. copies binaries and scripts to `ENTCOIN_INSTALL_DIR`;
 3. applies restrictive ACLs to install, wallet, Caddy, and log directories;
-4. registers `EntropySeedNode` under the supplied Windows account;
-5. registers `EntropySeedProxy` under `LOCAL SERVICE` with no Caddy admin API;
+4. registers `EntcoinSeedNode` under the supplied Windows account;
+5. registers `EntcoinSeedProxy` under `LOCAL SERVICE` with no Caddy admin API;
 6. creates one inbound Windows Firewall rule for TCP 443 only;
 7. starts the node, verifies local `/v2/status`, then starts Caddy.
 
@@ -160,15 +160,15 @@ The check verifies:
 - loopback `GET /v2/status`;
 - public HTTPS `GET /v2/status`;
 - matching height and tip hash through the proxy;
-- a WSS upgrade on `/v2/p2p` and a valid Entropy hello message.
+- a WSS upgrade on `/v2/p2p` and a valid Entcoin hello message.
 
 For local diagnosis before DNS is ready:
 
 ```powershell
 .\health-check.ps1 -LocalOnly
-Get-ScheduledTask EntropySeedNode, EntropySeedProxy |
+Get-ScheduledTask EntcoinSeedNode, EntcoinSeedProxy |
   Select-Object TaskName, State
-Get-ChildItem D:\EntropySeedLogs
+Get-ChildItem D:\EntcoinSeedLogs
 ```
 
 External monitoring should request `https://<domain>/v2/status` from another
@@ -230,5 +230,5 @@ wallet, chain, certificates, and logs:
 `-RemoveRuntimeData` permanently removes all retained runtime directories and
 must be used only after wallet recovery is verified.
 
-Entropy has not received an independent security or consensus audit. ENT must
+Entcoin has not received an independent security or consensus audit. ENT must
 not carry real-world value.

@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 var ErrTransactionAlreadyKnown = errors.New("transaction is already known")

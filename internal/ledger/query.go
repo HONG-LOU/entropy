@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 var (
@@ -299,7 +299,7 @@ func (l *Ledger) FindLocator(ctx context.Context, hashes []string) (uint64, stri
 			return 0, "", fmt.Errorf("find locator hash: %w", err)
 		}
 	}
-	return 0, "", fmt.Errorf("locator does not share the Entropy genesis")
+	return 0, "", fmt.Errorf("locator does not share the Entcoin genesis")
 }
 
 func (l *Ledger) WorkAt(ctx context.Context, height uint64) (*big.Int, error) {

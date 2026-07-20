@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 
 	"github.com/tyler-smith/go-bip39"
 	"github.com/tyler-smith/go-bip39/wordlists"

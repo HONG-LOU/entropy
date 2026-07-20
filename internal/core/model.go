@@ -2,6 +2,7 @@ package core
 
 const (
 	ChainName                               = "Entropy"
+	ProductName                             = "Entcoin"
 	ChainSymbol                             = "ENT"
 	NetworkID                               = "entropy-mainnet-v1"
 	StateVersion                            = 1

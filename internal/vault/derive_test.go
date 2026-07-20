@@ -6,13 +6,13 @@ import (
 	"sync"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
-const zeroEntropyMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
+const zeroEntcoinMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
 
 func TestMnemonicDerivationVector(t *testing.T) {
-	material, err := RestoreMnemonic(zeroEntropyMnemonic)
+	material, err := RestoreMnemonic(zeroEntcoinMnemonic)
 	if err != nil {
 		t.Fatalf("restore mnemonic: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestMnemonicRestoreIsConcurrentSafe(t *testing.T) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			material, err := RestoreMnemonic(zeroEntropyMnemonic)
+			material, err := RestoreMnemonic(zeroEntcoinMnemonic)
 			if err == nil {
 				err = material.Validate()
 				material.Clear()
@@ -76,19 +76,19 @@ func TestMnemonicRestoreIsConcurrentSafe(t *testing.T) {
 }
 
 func TestRestoreMnemonicNormalizesWhitespaceAndCase(t *testing.T) {
-	input := "  " + strings.ToUpper(strings.ReplaceAll(zeroEntropyMnemonic, " ", "  \n")) + "  "
+	input := "  " + strings.ToUpper(strings.ReplaceAll(zeroEntcoinMnemonic, " ", "  \n")) + "  "
 	material, err := RestoreMnemonic(input)
 	if err != nil {
 		t.Fatalf("restore normalized mnemonic: %v", err)
 	}
-	if material.Mnemonic != zeroEntropyMnemonic {
+	if material.Mnemonic != zeroEntcoinMnemonic {
 		t.Fatalf("normalized mnemonic = %q", material.Mnemonic)
 	}
 }
 
 func TestRestoreMnemonicRejectsInvalidOrNonTwentyFourWordPhrase(t *testing.T) {
 	twelveWords := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
-	invalidChecksum := strings.TrimSuffix(zeroEntropyMnemonic, "art") + "zoo"
+	invalidChecksum := strings.TrimSuffix(zeroEntcoinMnemonic, "art") + "zoo"
 	for _, phrase := range []string{"", twelveWords, invalidChecksum, "not a recovery phrase"} {
 		if _, err := RestoreMnemonic(phrase); !errors.Is(err, ErrInvalidMnemonic) {
 			t.Fatalf("RestoreMnemonic(%q) error = %v, want ErrInvalidMnemonic", phrase, err)
@@ -130,7 +130,7 @@ func TestFromLegacyPreservesWalletWithoutInventingMnemonic(t *testing.T) {
 }
 
 func TestMaterialValidationRejectsSourceMismatch(t *testing.T) {
-	material, err := RestoreMnemonic(zeroEntropyMnemonic)
+	material, err := RestoreMnemonic(zeroEntcoinMnemonic)
 	if err != nil {
 		t.Fatal(err)
 	}

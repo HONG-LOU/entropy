@@ -8,7 +8,7 @@ import (
 	"math"
 	"math/big"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 const (

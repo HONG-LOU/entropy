@@ -29,21 +29,55 @@ try {
     wails build -clean -trimpath -platform windows/amd64 -nsis -installscope user -webview2 download
     if ($LASTEXITCODE -ne 0) { throw "Wails build failed with exit code $LASTEXITCODE" }
     $bin = Join-Path $project "build\bin"
-    $portable = Join-Path $bin "Entropy.exe"
-    $installer = Join-Path $bin "entropy-amd64-installer.exe"
-    $cli = Join-Path $bin "entropy-cli.exe"
-    go build -trimpath -o $cli .\cmd\entropy
+    $portable = Join-Path $bin "Entcoin.exe"
+    $installer = Join-Path $bin "entcoin-amd64-installer.exe"
+    $cli = Join-Path $bin "entcoin-cli.exe"
+    go build -trimpath -o $cli .\cmd\entcoin
     if ($LASTEXITCODE -ne 0) { throw "CLI build failed with exit code $LASTEXITCODE" }
 
+    $signingCertificate = $env:ENTCOIN_WINDOWS_CERTIFICATE_BASE64
+    $signingPassword = $env:ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD
+    $requireSigning = $env:ENTCOIN_REQUIRE_WINDOWS_SIGNING -eq "true"
+    if ($signingCertificate -and $signingPassword) {
+        $signToolCommand = Get-Command signtool.exe -ErrorAction SilentlyContinue
+        if ($signToolCommand) {
+            $signTool = $signToolCommand.Source
+        }
+        else {
+            $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+                Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1 -ExpandProperty FullName
+        }
+        if (-not $signTool) { throw "Windows SDK signtool.exe is required for Authenticode signing" }
+        $certificatePath = Join-Path ([System.IO.Path]::GetTempPath()) "entcoin-signing-$([guid]::NewGuid().ToString('N')).pfx"
+        try {
+            [System.IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($signingCertificate))
+            $timestampURL = if ($env:ENTCOIN_WINDOWS_TIMESTAMP_URL) { $env:ENTCOIN_WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+            foreach ($artifact in @($portable, $installer, $cli)) {
+                & $signTool sign /fd SHA256 /td SHA256 /tr $timestampURL /f $certificatePath /p $signingPassword $artifact
+                if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $artifact" }
+                & $signTool verify /pa /all $artifact
+                if ($LASTEXITCODE -ne 0) { throw "Authenticode verification failed for $artifact" }
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+    elseif ($requireSigning) {
+        throw "Release signing is required; configure ENTCOIN_WINDOWS_CERTIFICATE_BASE64 and ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD"
+    }
+
     $seedStage = Join-Path $project "build\seed-package"
-    $seedPackage = Join-Path $bin "entropy-windows-seed-deploy.zip"
+    $seedPackage = Join-Path $bin "entcoin-windows-seed-deploy.zip"
     if (Test-Path -LiteralPath $seedStage) {
         Remove-Item -LiteralPath $seedStage -Recurse -Force
     }
     New-Item -ItemType Directory -Path $seedStage | Out-Null
     try {
         Copy-Item -Path (Join-Path $project "deploy\windows-seed\*") -Destination $seedStage -Recurse
-        Copy-Item -LiteralPath $cli -Destination (Join-Path $seedStage "entropy-cli.exe")
+        Copy-Item -LiteralPath $cli -Destination (Join-Path $seedStage "entcoin-cli.exe")
         Copy-Item -LiteralPath (Join-Path $project "docs\public-seed.md") -Destination (Join-Path $seedStage "PUBLIC-SEED.md")
         Compress-Archive -Path (Join-Path $seedStage "*") -DestinationPath $seedPackage -CompressionLevel Optimal -Force
     }

@@ -34,7 +34,7 @@ jobs:
         run: go vet ./...
 
       - name: Build headless node
-        run: go build -trimpath ./cmd/entropy
+        run: go build -trimpath ./cmd/entcoin
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -96,19 +96,19 @@ jobs:
       - name: Read package version
         run: |
           version=$(node -p "require('./frontend/package.json').version")
-          echo "ENTROPY_VERSION=$version" >> "$GITHUB_ENV"
+          echo "ENTCOIN_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Build Ubuntu package
-        run: ./scripts/build-linux.sh "$ENTROPY_VERSION"
+        run: ./scripts/build-linux.sh "$ENTCOIN_VERSION"
 
       - name: Inspect Ubuntu package
         run: |
-          dpkg-deb --info "build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
-          dpkg-deb --contents "build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
+          dpkg-deb --info "build/bin/entcoin_${ENTCOIN_VERSION}_amd64.deb"
+          dpkg-deb --contents "build/bin/entcoin_${ENTCOIN_VERSION}_amd64.deb"
           cd build/bin
           sha256sum --check SHA256SUMS-linux.txt
 
       - name: Install package and smoke-test Secret Service wallet
         run: |
-          sudo apt-get install -y "./build/bin/entropy_${ENTROPY_VERSION}_amd64.deb"
-          dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entropy-cli /tmp/entropy-wallet-smoke
+          sudo apt-get install -y "./build/bin/entcoin_${ENTCOIN_VERSION}_amd64.deb"
+          dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entcoin-cli /tmp/entcoin-wallet-smoke

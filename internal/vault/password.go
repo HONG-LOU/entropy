@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestShorterHigherWorkForkWins(t *testing.T) {

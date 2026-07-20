@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 var testPassword = []byte("correct horse battery staple")
 
 func fixedMaterial(t *testing.T) *Material {
 	t.Helper()
-	material, err := RestoreMnemonic(zeroEntropyMnemonic)
+	material, err := RestoreMnemonic(zeroEntcoinMnemonic)
 	if err != nil {
 		t.Fatalf("restore fixed mnemonic: %v", err)
 	}

@@ -15,7 +15,7 @@ if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Adm
 
 $config = Read-SeedEnvironment -Path $ConfigPath
 Assert-SeedEnvironment -Values $config
-foreach ($taskName in @("EntropySeedNode", "EntropySeedProxy")) {
+foreach ($taskName in @("EntcoinSeedNode", "EntcoinSeedProxy")) {
     if ($PSCmdlet.ShouldProcess($taskName, "Stop and unregister scheduled task")) {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         $deadline = (Get-Date).AddSeconds(20)
@@ -32,20 +32,20 @@ foreach ($taskName in @("EntropySeedNode", "EntropySeedProxy")) {
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
-if ($PSCmdlet.ShouldProcess("Entropy Seed HTTPS", "Remove TCP 443 firewall rule")) {
-    Get-NetFirewallRule -DisplayName "Entropy Seed HTTPS" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+if ($PSCmdlet.ShouldProcess("Entcoin Seed HTTPS", "Remove TCP 443 firewall rule")) {
+    Get-NetFirewallRule -DisplayName "Entcoin Seed HTTPS" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 }
 
-$installDirectory = [string]$config["ENTROPY_INSTALL_DIR"]
+$installDirectory = [string]$config["ENTCOIN_INSTALL_DIR"]
 if ($PSCmdlet.ShouldProcess($installDirectory, "Remove installed seed binaries and configuration")) {
     Remove-Item -LiteralPath $installDirectory -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 if ($RemoveRuntimeData) {
     foreach ($directory in @(
-        [string]$config["ENTROPY_DATA_DIR"],
-        [string]$config["ENTROPY_CADDY_DATA_DIR"],
-        [string]$config["ENTROPY_LOG_DIR"]
+        [string]$config["ENTCOIN_DATA_DIR"],
+        [string]$config["ENTCOIN_CADDY_DATA_DIR"],
+        [string]$config["ENTCOIN_LOG_DIR"]
     )) {
         if ($PSCmdlet.ShouldProcess($directory, "Permanently remove seed runtime data")) {
             Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue

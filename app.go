@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
-	"entropy/internal/node"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/node"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -145,7 +145,7 @@ func (a *App) GetStartupState() StartupState {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.service != nil && a.start == nil {
-		return StartupState{Ready: true, Code: "ready", Message: "Entropy node is running"}
+		return StartupState{Ready: true, Code: "ready", Message: "Entcoin node is running"}
 	}
 	if errors.Is(a.start, node.ErrLegacyWalletMigrationRequired) {
 		return StartupState{Code: "wallet_migration_required", Message: a.start.Error()}
@@ -153,7 +153,7 @@ func (a *App) GetStartupState() StartupState {
 	if a.start != nil {
 		return StartupState{Code: "startup_failed", Message: a.start.Error()}
 	}
-	return StartupState{Code: "starting", Message: "Entropy node is starting"}
+	return StartupState{Code: "starting", Message: "Entcoin node is starting"}
 }
 
 func (a *App) RetryStartup() (StartupState, error) {
@@ -315,9 +315,9 @@ func (a *App) ExportWalletBackup(password string) (ActionResult, error) {
 	ctx := a.ctx
 	a.mu.RUnlock()
 	path, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
-		Title:           "Export encrypted Entropy wallet",
-		DefaultFilename: "entropy-wallet.entwallet",
-		Filters:         []wailsruntime.FileFilter{{DisplayName: "Entropy wallet (*.entwallet)", Pattern: "*.entwallet"}},
+		Title:           "Export encrypted Entcoin wallet",
+		DefaultFilename: "entcoin-wallet.entwallet",
+		Filters:         []wailsruntime.FileFilter{{DisplayName: "Entcoin wallet (*.entwallet)", Pattern: "*.entwallet"}},
 	})
 	if err != nil {
 		return ActionResult{}, err
@@ -340,8 +340,8 @@ func (a *App) RestoreWalletBackup(password string) (ActionResult, error) {
 	ctx := a.ctx
 	a.mu.RUnlock()
 	path, err := wailsruntime.OpenFileDialog(ctx, wailsruntime.OpenDialogOptions{
-		Title:   "Restore encrypted Entropy wallet",
-		Filters: []wailsruntime.FileFilter{{DisplayName: "Entropy wallet (*.entwallet)", Pattern: "*.entwallet"}},
+		Title:   "Restore encrypted Entcoin wallet",
+		Filters: []wailsruntime.FileFilter{{DisplayName: "Entcoin wallet (*.entwallet)", Pattern: "*.entwallet"}},
 	})
 	if err != nil {
 		return ActionResult{}, err
@@ -412,8 +412,8 @@ func (a *App) MigrateLegacyWallet(password string) (ActionResult, error) {
 	}
 	path, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
 		Title:           "Create required legacy wallet backup",
-		DefaultFilename: "entropy-legacy-wallet.entwallet",
-		Filters:         []wailsruntime.FileFilter{{DisplayName: "Entropy wallet (*.entwallet)", Pattern: "*.entwallet"}},
+		DefaultFilename: "entcoin-legacy-wallet.entwallet",
+		Filters:         []wailsruntime.FileFilter{{DisplayName: "Entcoin wallet (*.entwallet)", Pattern: "*.entwallet"}},
 	})
 	if err != nil {
 		return ActionResult{}, err

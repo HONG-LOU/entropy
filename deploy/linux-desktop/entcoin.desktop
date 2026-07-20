@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Entcoin
+Comment=Entcoin proof-of-work mainnet desktop full node
+Exec=/usr/bin/entcoin
+Icon=entcoin
+Terminal=false
+Categories=Network;Finance;
+StartupNotify=true
+StartupWMClass=entcoin

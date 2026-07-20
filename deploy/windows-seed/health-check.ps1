@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "seed-config.ps1")
 
-function Assert-EntropyStatus {
+function Assert-EntcoinStatus {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Status,
@@ -17,7 +17,7 @@ function Assert-EntropyStatus {
     )
 
     if ($Status.protocol -ne "entropy-mainnet-v1" -or $Status.name -ne "Entropy" -or $Status.symbol -ne "ENT") {
-        throw "$Source returned an incompatible Entropy network identity"
+        throw "$Source returned an incompatible Entcoin network identity"
     }
     if ([uint64]$Status.height -lt 0 -or [string]$Status.tip_hash -notmatch '^[0-9a-f]{64}$') {
         throw "$Source returned malformed chain status"
@@ -28,7 +28,7 @@ function Assert-EntropyStatus {
     }
 }
 
-function Receive-EntropyHello {
+function Receive-EntcoinHello {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][System.Uri]$Uri,
@@ -43,7 +43,7 @@ function Receive-EntropyHello {
         $segment = [System.ArraySegment[byte]]::new($buffer)
         $result = $socket.ReceiveAsync($segment, $cancellation.Token).GetAwaiter().GetResult()
         if ($result.MessageType -ne [System.Net.WebSockets.WebSocketMessageType]::Text -or $result.Count -le 0) {
-            throw "WSS endpoint did not return an Entropy hello message"
+            throw "WSS endpoint did not return an Entcoin hello message"
         }
         $message = [System.Text.Encoding]::UTF8.GetString($buffer, 0, $result.Count) | ConvertFrom-Json
         if ($message.type -ne "hello" -or $message.protocol -ne "entropy-mainnet-v1") {
@@ -66,26 +66,26 @@ try {
     $config = Read-SeedEnvironment -Path $ConfigPath
     Assert-SeedEnvironment -Values $config
 
-    $localUri = "http://$($config['ENTROPY_LISTEN_ADDRESS'])/v2/status"
+    $localUri = "http://$($config['ENTCOIN_LISTEN_ADDRESS'])/v2/status"
     $local = Invoke-RestMethod -Uri $localUri -TimeoutSec $TimeoutSeconds
-    Assert-EntropyStatus -Status $local -Source $localUri
+    Assert-EntcoinStatus -Status $local -Source $localUri
 
     if (-not $LocalOnly) {
-        $publicBase = "https://$($config['ENTROPY_SEED_DOMAIN'])"
+        $publicBase = "https://$($config['ENTCOIN_SEED_DOMAIN'])"
         $publicUri = "$publicBase/v2/status"
         $public = Invoke-RestMethod -Uri $publicUri -TimeoutSec $TimeoutSeconds
-        Assert-EntropyStatus -Status $public -Source $publicUri
+        Assert-EntcoinStatus -Status $public -Source $publicUri
         if ([uint64]$public.height -ne [uint64]$local.height -or [string]$public.tip_hash -ne [string]$local.tip_hash) {
             throw "Public status does not match the loopback node"
         }
         if (-not $SkipWebSocket) {
-            Receive-EntropyHello -Uri ([System.Uri]("wss://$($config['ENTROPY_SEED_DOMAIN'])/v2/p2p")) -Timeout $TimeoutSeconds
+            Receive-EntcoinHello -Uri ([System.Uri]("wss://$($config['ENTCOIN_SEED_DOMAIN'])/v2/p2p")) -Timeout $TimeoutSeconds
         }
     }
 
     [PSCustomObject]@{
         Healthy = $true
-        Domain = [string]$config["ENTROPY_SEED_DOMAIN"]
+        Domain = [string]$config["ENTCOIN_SEED_DOMAIN"]
         Height = [uint64]$local.height
         TipHash = [string]$local.tip_hash
         PublicChecked = -not $LocalOnly

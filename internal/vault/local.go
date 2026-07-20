@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 // EncryptLocal returns a wallet document protected by the current operating

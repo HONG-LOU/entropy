@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"entropy/internal/core"
-	"entropy/internal/store"
-	"entropy/internal/vault"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/store"
+	"github.com/HONG-LOU/entcoin/internal/vault"
 )
 
 const (

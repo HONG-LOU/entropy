@@ -15,7 +15,7 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 	err := wails.Run(&options.App{
-		Title:             "Entropy",
+		Title:             "Entcoin",
 		Width:             1180,
 		Height:            780,
 		MinWidth:          860,

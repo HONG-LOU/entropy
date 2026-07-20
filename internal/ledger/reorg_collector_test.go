@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestOrphanedMempoolCollectorPreservesDependencyOrder(t *testing.T) {

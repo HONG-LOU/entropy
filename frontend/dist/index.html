@@ -9,9 +9,9 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'self'"
     />
     <link rel="icon" href="data:," />
-    <title>Entropy Node</title>
-    <script type="module" crossorigin src="/assets/index-aWAS-5y1.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B5Z3PO45.css">
+    <title>Entcoin Node</title>
+    <script type="module" crossorigin src="/assets/index-BurdmTr2.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-iQVbd_IQ.css">
   </head>
   <body>
     <div id="app">
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <div class="brand-mark" aria-hidden="true">E</div>
           <div>
-            <strong>Entropy</strong>
+            <strong>Entcoin</strong>
             <span>ENT desktop node</span>
           </div>
         </div>
@@ -255,7 +255,7 @@
               </div>
             </form>
           </section>
-          <p class="network-risk-notice"><i data-lucide="circle-alert"></i><span>Mainnet is a compatibility ID, not an audit. Entropy is unaudited; ENT must not carry real-world value.</span></p>
+          <p class="network-risk-notice"><i data-lucide="circle-alert"></i><span>Mainnet is a compatibility ID, not an audit. Entcoin is unaudited; ENT must not carry real-world value.</span></p>
         </section>
       </main>
 
@@ -263,7 +263,7 @@
 
       <div class="startup-overlay visible" id="startup-overlay" role="dialog" aria-modal="true" aria-labelledby="startup-title">
         <section class="startup-window">
-          <div class="startup-brand"><span class="brand-mark">E</span><div><strong>Entropy Node</strong><span>Secure desktop startup</span></div></div>
+          <div class="startup-brand"><span class="brand-mark">E</span><div><strong>Entcoin Node</strong><span>Secure desktop startup</span></div></div>
           <div id="startup-loading">
             <span class="startup-spinner"><i data-lucide="loader-circle"></i></span>
             <h1 id="startup-title">Starting local node</h1>
@@ -394,6 +394,16 @@
           </dl>
           <label class="check-control destructive-check"><input id="prune-confirm-check" type="checkbox" /><span>I understand old bodies and undo data cannot be restored without resyncing</span></label>
           <button class="danger-button full-button" id="confirm-prune" type="button" disabled><i data-lucide="trash-2"></i><span>Prune ledger</span></button>
+        </div>
+      </dialog>
+
+      <dialog class="modal" id="transaction-dialog" aria-labelledby="transaction-dialog-title">
+        <div class="modal-shell wide-modal">
+          <header class="modal-heading">
+            <div><span class="modal-icon blue"><i data-lucide="receipt-text"></i></span><div><p class="eyebrow">Transaction</p><h2 id="transaction-dialog-title">Transaction details</h2></div></div>
+            <button class="icon-button" type="button" data-close-dialog="transaction-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+          </header>
+          <div class="transaction-detail" id="transaction-detail"></div>
         </div>
       </dialog>
     </div>

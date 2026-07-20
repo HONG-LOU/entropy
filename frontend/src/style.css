@@ -277,6 +277,22 @@ td code { color: var(--green); }
 .history-table th:nth-child(2), .history-table td:nth-child(2) { width: 31%; }
 .history-table th:nth-child(3), .history-table td:nth-child(3), .history-table th:nth-child(4), .history-table td:nth-child(4) { width: 15%; text-align: right; }
 .history-table th:nth-child(5), .history-table td:nth-child(5) { width: 21%; text-align: right; }
+.transaction-row { cursor: pointer; }
+.transaction-row:hover td, .transaction-row:focus-visible td { background: #f2f6f4; }
+.transaction-row:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.transaction-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; margin: 0; }
+.transaction-overview div:first-child, .transaction-overview div:nth-child(8) { grid-column: 1 / -1; }
+.transaction-overview dt { margin-bottom: 5px; color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.transaction-overview dd { margin: 0; font-size: 11px; overflow-wrap: anywhere; }
+.transaction-overview code { display: block; font-size: 10px; white-space: normal; }
+.transaction-io-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+.transaction-io-grid section { min-width: 0; }
+.transaction-io-grid h3 { margin: 0 0 10px; font-size: 12px; }
+.transaction-io-grid ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: transaction-entry; }
+.transaction-io-grid li { min-width: 0; padding: 10px; border: 1px solid var(--soft-line); background: #f7f8f6; font-size: 10px; overflow-wrap: anywhere; counter-increment: transaction-entry; }
+.transaction-io-grid li::before { content: counter(transaction-entry); display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; }
+.transaction-io-grid strong, .transaction-io-grid code { display: block; font-size: 10px; white-space: normal; }
+.transaction-io-grid strong { margin-bottom: 5px; color: var(--green); }
 .tx-identity { min-width: 0; display: flex; align-items: center; gap: 9px; }
 .tx-direction { width: 27px; height: 27px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; }
 .tx-direction.received { color: var(--green); background: var(--green-soft); }
@@ -455,6 +471,7 @@ dialog.modal[open] { display: grid; place-items: center; }
 }
 
 @media (max-width: 680px) {
+	.transaction-overview, .transaction-io-grid { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
   .node-state code { display: none; }
   .workspace { padding-right: 14px; padding-left: 14px; }

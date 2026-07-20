@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 // ImportState performs the one-time migration from the legacy replayed state.

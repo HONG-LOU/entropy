@@ -1,8 +1,8 @@
-# Entropy v1.0.4 architecture
+# Entcoin v1.0.5 architecture
 
 ## Scope
 
-Entropy v1.0.4 implements the `entropy-mainnet-v1` network. It is designed so
+Entcoin v1.0.5 implements the `entropy-mainnet-v1` network. It is designed so
 one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
@@ -17,7 +17,7 @@ not carry real-world value without appropriate independent audits.
 The desktop and CLI use the same Go service and consensus code:
 
 ```text
-Wails desktop UI                     cmd/entropy CLI
+Wails desktop UI                     cmd/entcoin CLI
         |                                  |
         +----------------+-----------------+
                          |
@@ -147,8 +147,8 @@ same commit path; neither can bypass validation.
 
 ## SQLite ledger
 
-The ledger is `%LOCALAPPDATA%\Entropy\mainnet-v1\entropy.db` on Windows and
-`~/.config/Entropy/mainnet-v1/entropy.db` on Ubuntu. It uses the pure-Go
+The ledger is `%LOCALAPPDATA%\Entcoin\mainnet-v1\entropy.db` on Windows and
+`~/.config/Entcoin/mainnet-v1/entropy.db` on Ubuntu. It uses the pure-Go
 `modernc.org/sqlite` driver. Connections set:
 
 ```text
@@ -328,11 +328,11 @@ wallet node.
 
 ## Wallet vault and recovery
 
-New wallets use 256 bits of entropy encoded as 24 English BIP39 words. Entropy
+New wallets use 256 bits of entropy encoded as 24 English BIP39 words. Entcoin
 then deterministically derives a P-256 private scalar using the versioned
 `entropy-p256-bip39-hmac-sha256-v1` derivation. This is not BIP32, SLIP-0010, or
 a Bitcoin wallet path; importing the phrase into unrelated wallet software
-will not produce the Entropy address.
+will not produce the Entcoin address.
 
 Each local wallet profile uses Windows user-scope DPAPI or Linux Secret Service
 plus XChaCha20-Poly1305. `wallet.vault` remains the active restart pointer while
@@ -362,13 +362,13 @@ is therefore portable to supported servers.
 ## Testnet isolation and wallet recovery
 
 Mainnet uses both a new reward-free genesis and the isolated
-`%LOCALAPPDATA%\Entropy\mainnet-v1` directory. The ledger rejects a published
+`%LOCALAPPDATA%\Entcoin\mainnet-v1` directory. The ledger rejects a published
 testnet protocol or genesis before migration or schema work. Testnet
 `chain.json`, SQLite databases, mempools, peers, balances, and histories are
 never imported or replayed into mainnet.
 
 Wallet material is recoverable independently of chain state. A user may restore
-a known 24-word Entropy phrase or verified `.entwallet` backup in the mainnet
+a known 24-word Entcoin phrase or verified `.entwallet` backup in the mainnet
 desktop application. This recovers the P-256 key and address, while mainnet
 balances and history come only from mainnet blocks. A v0.1 plaintext wallet can
 first be converted with `wallet-migrate` against a copy of its old directory;

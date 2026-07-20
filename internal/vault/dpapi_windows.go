@@ -59,7 +59,7 @@ func cryptProtectData(input, entropy []byte, protect bool) ([]byte, error) {
 	var output windows.DataBlob
 	var err error
 	if protect {
-		description, conversionErr := windows.UTF16PtrFromString("Entropy wallet vault")
+		description, conversionErr := windows.UTF16PtrFromString("Entcoin wallet vault")
 		if conversionErr != nil {
 			return nil, fmt.Errorf("prepare DPAPI description: %w", conversionErr)
 		}

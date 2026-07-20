@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 
 	"github.com/gorilla/websocket"
 )

@@ -1,18 +1,18 @@
 Set-StrictMode -Version Latest
 
 $script:SeedEnvironmentNames = @(
-    "ENTROPY_SEED_DOMAIN",
-    "ENTROPY_ACME_EMAIL",
-    "ENTROPY_INSTALL_DIR",
-    "ENTROPY_DATA_DIR",
-    "ENTROPY_CADDY_DATA_DIR",
-    "ENTROPY_LOG_DIR",
-    "ENTROPY_LISTEN_ADDRESS",
-    "ENTROPY_BOOTSTRAP_PEER",
-    "ENTROPY_BOOTSTRAP_MANIFEST_URLS",
-    "ENTROPY_PRUNE_DEPTH",
-    "ENTROPY_DISABLE_DISCOVERY",
-    "ENTROPY_TRUST_LOOPBACK_PROXY"
+    "ENTCOIN_SEED_DOMAIN",
+    "ENTCOIN_ACME_EMAIL",
+    "ENTCOIN_INSTALL_DIR",
+    "ENTCOIN_DATA_DIR",
+    "ENTCOIN_CADDY_DATA_DIR",
+    "ENTCOIN_LOG_DIR",
+    "ENTCOIN_LISTEN_ADDRESS",
+    "ENTCOIN_BOOTSTRAP_PEER",
+    "ENTCOIN_BOOTSTRAP_MANIFEST_URLS",
+    "ENTCOIN_PRUNE_DEPTH",
+    "ENTCOIN_DISABLE_DISCOVERY",
+    "ENTCOIN_TRUST_LOOPBACK_PROXY"
 )
 
 function Read-SeedEnvironment {
@@ -105,22 +105,22 @@ function Assert-SeedEnvironment {
         }
     }
 
-    $domain = [string]$Values["ENTROPY_SEED_DOMAIN"]
+    $domain = [string]$Values["ENTCOIN_SEED_DOMAIN"]
     if ([System.Uri]::CheckHostName($domain) -ne [System.UriHostNameType]::Dns -or $domain -notmatch '^[A-Za-z0-9.-]+$') {
-        throw "ENTROPY_SEED_DOMAIN must be one ASCII DNS hostname without a scheme or path"
+        throw "ENTCOIN_SEED_DOMAIN must be one ASCII DNS hostname without a scheme or path"
     }
 
     try {
-        $mail = [System.Net.Mail.MailAddress]::new([string]$Values["ENTROPY_ACME_EMAIL"])
+        $mail = [System.Net.Mail.MailAddress]::new([string]$Values["ENTCOIN_ACME_EMAIL"])
     }
     catch {
-        throw "ENTROPY_ACME_EMAIL must be a valid email address"
+        throw "ENTCOIN_ACME_EMAIL must be a valid email address"
     }
-    if ($mail.Address -ne [string]$Values["ENTROPY_ACME_EMAIL"]) {
-        throw "ENTROPY_ACME_EMAIL must not contain a display name"
+    if ($mail.Address -ne [string]$Values["ENTCOIN_ACME_EMAIL"]) {
+        throw "ENTCOIN_ACME_EMAIL must not contain a display name"
     }
 
-    foreach ($name in @("ENTROPY_INSTALL_DIR", "ENTROPY_DATA_DIR", "ENTROPY_CADDY_DATA_DIR", "ENTROPY_LOG_DIR")) {
+    foreach ($name in @("ENTCOIN_INSTALL_DIR", "ENTCOIN_DATA_DIR", "ENTCOIN_CADDY_DATA_DIR", "ENTCOIN_LOG_DIR")) {
         $value = [string]$Values[$name]
         if ([string]::IsNullOrWhiteSpace($value) -or -not [System.IO.Path]::IsPathRooted($value)) {
             throw "$name must be an absolute Windows path"
@@ -131,13 +131,13 @@ function Assert-SeedEnvironment {
             throw "$name must not be a filesystem root"
         }
     }
-    $installDirectory = [string]$Values["ENTROPY_INSTALL_DIR"]
-    $runtimeNames = @("ENTROPY_DATA_DIR", "ENTROPY_CADDY_DATA_DIR", "ENTROPY_LOG_DIR")
+    $installDirectory = [string]$Values["ENTCOIN_INSTALL_DIR"]
+    $runtimeNames = @("ENTCOIN_DATA_DIR", "ENTCOIN_CADDY_DATA_DIR", "ENTCOIN_LOG_DIR")
     foreach ($name in $runtimeNames) {
         $runtimeDirectory = [string]$Values[$name]
         if ((Test-SeedPathWithin -Child $runtimeDirectory -Parent $installDirectory) -or
             (Test-SeedPathWithin -Child $installDirectory -Parent $runtimeDirectory)) {
-            throw "$name must be outside ENTROPY_INSTALL_DIR so upgrades cannot remove runtime data"
+            throw "$name must be outside ENTCOIN_INSTALL_DIR so upgrades cannot remove runtime data"
         }
     }
     for ($left = 0; $left -lt $runtimeNames.Count; $left++) {
@@ -151,39 +151,39 @@ function Assert-SeedEnvironment {
         }
     }
 
-    $listen = [string]$Values["ENTROPY_LISTEN_ADDRESS"]
+    $listen = [string]$Values["ENTCOIN_LISTEN_ADDRESS"]
     if ($listen -notmatch '^127\.0\.0\.1:([0-9]{1,5})$') {
-        throw "ENTROPY_LISTEN_ADDRESS must use the loopback form 127.0.0.1:PORT"
+        throw "ENTCOIN_LISTEN_ADDRESS must use the loopback form 127.0.0.1:PORT"
     }
     $port = [int]$Matches[1]
     if ($port -lt 1 -or $port -gt 65535) {
-        throw "ENTROPY_LISTEN_ADDRESS port must be between 1 and 65535"
+        throw "ENTCOIN_LISTEN_ADDRESS port must be between 1 and 65535"
     }
     if ($port -ne 47821) {
-        throw "The public seed deployment requires ENTROPY_LISTEN_ADDRESS=127.0.0.1:47821"
+        throw "The public seed deployment requires ENTCOIN_LISTEN_ADDRESS=127.0.0.1:47821"
     }
 
-    if ([string]$Values["ENTROPY_PRUNE_DEPTH"] -ne "0") {
-        throw "A public bootstrap seed must use ENTROPY_PRUNE_DEPTH=0 (archive mode)"
+    if ([string]$Values["ENTCOIN_PRUNE_DEPTH"] -ne "0") {
+        throw "A public bootstrap seed must use ENTCOIN_PRUNE_DEPTH=0 (archive mode)"
     }
-    if ([string]$Values["ENTROPY_DISABLE_DISCOVERY"] -ne "true") {
-        throw "A public seed must use ENTROPY_DISABLE_DISCOVERY=true"
+    if ([string]$Values["ENTCOIN_DISABLE_DISCOVERY"] -ne "true") {
+        throw "A public seed must use ENTCOIN_DISABLE_DISCOVERY=true"
     }
-    if ([string]$Values["ENTROPY_TRUST_LOOPBACK_PROXY"] -ne "true") {
-        throw "Caddy requires ENTROPY_TRUST_LOOPBACK_PROXY=true"
+    if ([string]$Values["ENTCOIN_TRUST_LOOPBACK_PROXY"] -ne "true") {
+        throw "Caddy requires ENTCOIN_TRUST_LOOPBACK_PROXY=true"
     }
 
-    $peer = [string]$Values["ENTROPY_BOOTSTRAP_PEER"]
+    $peer = [string]$Values["ENTCOIN_BOOTSTRAP_PEER"]
     if (-not [string]::IsNullOrWhiteSpace($peer) -and -not (Test-SeedHttpsBaseUrl -Value $peer)) {
-        throw "ENTROPY_BOOTSTRAP_PEER must be an HTTPS base URL without a path, query, or fragment"
+        throw "ENTCOIN_BOOTSTRAP_PEER must be an HTTPS base URL without a path, query, or fragment"
     }
-    $manifestURLs = @(([string]$Values["ENTROPY_BOOTSTRAP_MANIFEST_URLS"]).Split(",") | ForEach-Object { $_.Trim() })
+    $manifestURLs = @(([string]$Values["ENTCOIN_BOOTSTRAP_MANIFEST_URLS"]).Split(",") | ForEach-Object { $_.Trim() })
     if ($manifestURLs.Count -eq 0 -or $manifestURLs.Count -gt 8 -or $manifestURLs -contains "") {
-        throw "ENTROPY_BOOTSTRAP_MANIFEST_URLS must contain between 1 and 8 comma-separated URLs"
+        throw "ENTCOIN_BOOTSTRAP_MANIFEST_URLS must contain between 1 and 8 comma-separated URLs"
     }
     foreach ($manifestURL in $manifestURLs) {
         if (-not (Test-SeedHttpsUrl -Value $manifestURL)) {
-            throw "ENTROPY_BOOTSTRAP_MANIFEST_URLS contains an invalid HTTPS URL"
+            throw "ENTCOIN_BOOTSTRAP_MANIFEST_URLS contains an invalid HTTPS URL"
         }
     }
 }

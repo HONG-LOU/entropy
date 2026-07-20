@@ -3,6 +3,35 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.5] - 2026-07-21
+
+### Added
+
+- Clickable and keyboard-accessible desktop transaction details with status,
+  confirmations, block metadata, inputs, outputs, and pruned-body state.
+- Optional SHA-256 Authenticode signing with RFC 3161 timestamps for Windows
+  desktop, installer, and CLI artifacts when a CA certificate is configured.
+
+### Changed
+
+- Product branding, executables, installers, packages, CLI commands, service
+  names, repository links, and website assets now use Entcoin.
+- The source repository moved to `HONG-LOU/entcoin`.
+- New installations use Entcoin application-data and Linux Secret Service
+  names while existing Entropy mainnet data and wallet keys remain available.
+
+### Security
+
+- v1.0.5 Windows artifacts are published unsigned and may trigger Microsoft
+  Defender SmartScreen. SHA-256 checksums provide integrity, not publisher
+  identity or reputation.
+
+### Compatibility
+
+- Consensus identity `entropy-mainnet-v1`, genesis hash domains, transaction
+  signatures, wallet formats and derivation, addresses, and `entropy.db` are
+  unchanged from v1.0.0-v1.0.4.
+
 ## [1.0.4] - 2026-07-19
 
 ### Fixed
@@ -10,7 +39,7 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 - Desktop chain status now reports synchronization only when an active peer
   sync targets a height above the local validated tip. Polling an equal or
   behind peer no longer leaves an up-to-date node labelled as synchronizing.
-- Website icon URLs are versioned so browsers refresh the Entropy E mark
+- Website icon URLs are versioned so browsers refresh the Entcoin E mark
   instead of retaining an older cached application or favicon asset.
 
 ### Compatibility
@@ -161,7 +190,7 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
   per-IP limits.
 - Automatic LAN multicast discovery and persistent exponential peer backoff.
 - Windows user-scope DPAPI wallet vault.
-- New-wallet 24-word BIP39 recovery using a versioned Entropy P-256 derivation.
+- New-wallet 24-word BIP39 recovery using a versioned Entcoin P-256 derivation.
 - Portable Argon2id/XChaCha20-Poly1305 `.entwallet` export and restore.
 - Desktop transaction history, confirmation/spendable state, peer management,
   wallet recovery, database diagnostics, and pruning workflow.

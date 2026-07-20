@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestLocalDPAPIRoundTripAndNoPlaintextSecret(t *testing.T) {

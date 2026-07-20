@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 )
 
 const discoveryGroup = "239.255.78.21:47822"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"entropy/internal/ledger"
-	"entropy/internal/store"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/store"
 )
 
 func migrateLegacyState(ctx context.Context, storage *store.Store, chain *ledger.Ledger) error {

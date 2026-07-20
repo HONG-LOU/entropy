@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/node"
+	"github.com/HONG-LOU/entcoin/internal/node"
 )
 
 func TestParseNodeOptionsReturnsFlagHelp(t *testing.T) {

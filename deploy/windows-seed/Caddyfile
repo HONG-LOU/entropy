@@ -1,19 +1,19 @@
 {
 	admin off
 	auto_https disable_redirects
-	email {$ENTROPY_ACME_EMAIL}
+	email {$ENTCOIN_ACME_EMAIL}
 	servers {
 		protocols h1 h2
 	}
 	storage file_system {
-		root "{$ENTROPY_CADDY_DATA_DIR}"
+		root "{$ENTCOIN_CADDY_DATA_DIR}"
 	}
 }
 
-https://{$ENTROPY_SEED_DOMAIN} {
+https://{$ENTCOIN_SEED_DOMAIN} {
 	tls {
 		issuer acme {
-			email {$ENTROPY_ACME_EMAIL}
+			email {$ENTCOIN_ACME_EMAIL}
 			disable_http_challenge
 		}
 	}
@@ -25,9 +25,9 @@ https://{$ENTROPY_SEED_DOMAIN} {
 	}
 
 	route {
-		@entropy_protocol path /v2/*
-		reverse_proxy @entropy_protocol http://{$ENTROPY_LISTEN_ADDRESS} {
-			header_up X-Entropy-Client-IP {remote_host}
+		@entcoin_protocol path /v2/*
+		reverse_proxy @entcoin_protocol http://{$ENTCOIN_LISTEN_ADDRESS} {
+			header_up X-Entcoin-Client-IP {remote_host}
 			transport http {
 				versions 1.1
 			}
@@ -36,7 +36,7 @@ https://{$ENTROPY_SEED_DOMAIN} {
 	}
 
 	log {
-		output file "{$ENTROPY_LOG_DIR}/caddy-access.log" {
+		output file "{$ENTCOIN_LOG_DIR}/caddy-access.log" {
 			roll_size 50MiB
 			roll_keep 10
 			roll_keep_for 336h

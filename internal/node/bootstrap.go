@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 )
 
 const (
@@ -25,8 +25,8 @@ const (
 )
 
 var defaultBootstrapManifestURLs = []string{
-	"https://raw.githubusercontent.com/HONG-LOU/entropy/main/network/mainnet.json",
-	"https://cdn.jsdelivr.net/gh/HONG-LOU/entropy@main/network/mainnet.json",
+	"https://raw.githubusercontent.com/HONG-LOU/entcoin/main/network/mainnet.json",
+	"https://cdn.jsdelivr.net/gh/HONG-LOU/entcoin@main/network/mainnet.json",
 }
 
 type bootstrapManifest struct {
@@ -113,7 +113,7 @@ func fetchBootstrapManifest(ctx context.Context, client *http.Client, source str
 		return nil, fmt.Errorf("bootstrap manifest version %d is not supported", manifest.Version)
 	}
 	if manifest.Protocol != ledger.ProtocolName {
-		return nil, fmt.Errorf("bootstrap manifest is for an incompatible Entropy protocol")
+		return nil, fmt.Errorf("bootstrap manifest is for an incompatible Entcoin protocol")
 	}
 	if len(manifest.Peers) == 0 {
 		return nil, fmt.Errorf("bootstrap manifest contains no public peers")

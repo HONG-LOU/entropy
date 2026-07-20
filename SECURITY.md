@@ -2,7 +2,7 @@
 
 ## Mainnet warning
 
-Entropy v1.0.4 uses the compatibility identity `entropy-mainnet-v1`. The word
+Entcoin v1.0.5 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
 not mean the implementation is independently audited or production-safe. ENT
 must not represent money, deposits, securities, redeemable claims, or any other
@@ -34,7 +34,7 @@ inflate supply, cause an invalid reorg, corrupt persistent state, or remotely
 exhaust/crash nodes, use GitHub's private vulnerability report for this
 repository:
 
-<https://github.com/HONG-LOU/entropy/security/advisories/new>
+<https://github.com/HONG-LOU/entcoin/security/advisories/new>
 
 Do not include wallet phrases, private keys, live host credentials, or a
 weaponized public exploit. If private vulnerability reporting is unavailable,
@@ -68,7 +68,7 @@ guaranteed response-time program.
 - A process in the same unlocked Linux desktop session may request the Secret
   Service key or inspect process memory. Secret Service is not protection from
   a compromised account or administrator.
-- New wallets have a 24-word BIP39 phrase with an Entropy-specific P-256
+- New wallets have a 24-word BIP39 phrase with an Entcoin-specific P-256
   derivation. The phrase is the key; anyone who learns it controls the wallet.
 - Portable `.entwallet` backups use Argon2id and XChaCha20-Poly1305. Their
   security still depends on a strong, secret password and uncompromised host.
@@ -114,13 +114,14 @@ guaranteed response-time program.
   eclipse-resistant peer selection or automatic NAT traversal.
 - Built-in HTTPS manifest delivery is a discovery mechanism, not a trust root or
   consensus authority. A published seed cannot change locally validated rules.
-- Windows binaries are not Authenticode-signed and builds are not yet
-  reproducible. Verify published checksums, while understanding their limit.
-- P-256 addresses and mnemonic derivation are Entropy-specific and not Bitcoin
+- v1.0.5 Windows binaries are not Authenticode-signed and may trigger
+  SmartScreen. Release CI signs and verifies every EXE when a CA-issued
+  certificate is configured; builds are not yet reproducible.
+- P-256 addresses and mnemonic derivation are Entcoin-specific and not Bitcoin
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v1.0.4. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.5. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.

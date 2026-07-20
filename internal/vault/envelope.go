@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 const (

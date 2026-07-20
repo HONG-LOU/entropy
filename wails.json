@@ -1,19 +1,19 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "entropy",
-  "outputfilename": "Entropy",
+  "name": "entcoin",
+  "outputfilename": "Entcoin",
   "frontend:install": "npm ci",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "Entropy Project"
+    "name": "Entcoin Project"
   },
   "info": {
-    "companyName": "Entropy Project",
-    "productName": "Entropy",
-    "productVersion": "1.0.4",
-    "copyright": "2026 Entropy Project",
-    "comments": "Entropy proof-of-work mainnet desktop full node"
+    "companyName": "Entcoin Project",
+    "productName": "Entcoin",
+    "productVersion": "1.0.5",
+    "copyright": "2026 Entcoin Project",
+    "comments": "Entcoin proof-of-work mainnet desktop full node"
   }
 }

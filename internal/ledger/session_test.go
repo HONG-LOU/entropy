@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestPublishedTestnetLedgerIsRejectedWithoutMutation(t *testing.T) {
@@ -76,7 +76,7 @@ func TestNonMainnetProtocolsAreRejectedWithoutUpgrade(t *testing.T) {
 func TestLegacyChainJSONIsRejectedBeforeDatabaseCreation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "chain.json")
-	contents := []byte(`{"version":1,"name":"Entropy","symbol":"ENT","blocks":[],"pending":[]}`)
+	contents := []byte(`{"version":1,"name":"Entcoin","symbol":"ENT","blocks":[],"pending":[]}`)
 	if err := os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 	_ "modernc.org/sqlite"
 )
 

@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
-	"entropy/internal/store"
-	"entropy/internal/vault"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/store"
+	"github.com/HONG-LOU/entcoin/internal/vault"
 )
 
 const walletVaultName = "wallet.vault"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
-    echo "usage: $0 ENTROPY_CLI TEMP_HOME" >&2
+    echo "usage: $0 ENTCOIN_CLI TEMP_HOME" >&2
     exit 2
 fi
 
@@ -13,7 +13,7 @@ port=47911
 rm -rf "$test_home"
 mkdir -p "$test_home"
 export HOME=$test_home
-eval "$(printf 'entropy-ci-keyring' | gnome-keyring-daemon --unlock --components=secrets)"
+eval "$(printf 'entcoin-ci-keyring' | gnome-keyring-daemon --unlock --components=secrets)"
 
 "$cli" node \
     --data "$test_home/node" \

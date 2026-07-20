@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"entropy/internal/core"
-	"entropy/internal/ledger"
+	"github.com/HONG-LOU/entcoin/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/ledger"
 
 	"github.com/gorilla/websocket"
 )
@@ -270,7 +270,7 @@ func TestTrustLoopbackProxyUsesOnlySingleDedicatedClientIPHeader(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/v2/status", nil)
 			request.RemoteAddr = test.remoteAddr
 			for _, value := range test.headers {
-				request.Header.Add(entropyClientIPHeader, value)
+				request.Header.Add(entcoinClientIPHeader, value)
 			}
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, request)

@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]$ConfigPath = (Join-Path $PSScriptRoot "seed.env"),
-    [string]$EntropyCliPath = (Join-Path $PSScriptRoot "entropy-cli.exe"),
+    [string]$EntcoinCliPath = (Join-Path $PSScriptRoot "entcoin-cli.exe"),
     [string]$CaddyPath = (Join-Path $PSScriptRoot "caddy.exe"),
     [System.Management.Automation.PSCredential]$NodeCredential,
     [switch]$SkipFirewall,
@@ -11,9 +11,9 @@ param(
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "seed-config.ps1")
 
-$nodeTaskName = "EntropySeedNode"
-$proxyTaskName = "EntropySeedProxy"
-$firewallRuleName = "Entropy Seed HTTPS"
+$nodeTaskName = "EntcoinSeedNode"
+$proxyTaskName = "EntcoinSeedProxy"
+$firewallRuleName = "Entcoin Seed HTTPS"
 $windowsPowerShell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 function Assert-Administrator {
@@ -72,24 +72,24 @@ function Wait-ForLocalNode {
         }
         Start-Sleep -Seconds 1
     } while ((Get-Date) -lt $deadline)
-    throw "Entropy seed node did not become healthy within 45 seconds"
+    throw "Entcoin seed node did not become healthy within 45 seconds"
 }
 
 Assert-Administrator
 $config = Read-SeedEnvironment -Path $ConfigPath
 Assert-SeedEnvironment -Values $config
-if ([string]$config["ENTROPY_SEED_DOMAIN"] -like "*.example.com" -or
-    [string]$config["ENTROPY_ACME_EMAIL"] -like "*@example.com") {
+if ([string]$config["ENTCOIN_SEED_DOMAIN"] -like "*.example.com" -or
+    [string]$config["ENTCOIN_ACME_EMAIL"] -like "*@example.com") {
     throw "Replace the example domain and ACME email before installation"
 }
 
-foreach ($path in @($EntropyCliPath, $CaddyPath)) {
+foreach ($path in @($EntcoinCliPath, $CaddyPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required executable is missing: $path"
     }
 }
 if ($null -eq $NodeCredential) {
-    $NodeCredential = Get-Credential -Message "Dedicated Windows account for the walletless Entropy seed service"
+    $NodeCredential = Get-Credential -Message "Dedicated Windows account for the walletless Entcoin seed service"
 }
 $nodeAccount = $NodeCredential.UserName
 try {
@@ -99,11 +99,11 @@ catch {
     throw "Cannot resolve the node service account '$nodeAccount'"
 }
 
-$installDirectory = [string]$config["ENTROPY_INSTALL_DIR"]
-$dataDirectory = [string]$config["ENTROPY_DATA_DIR"]
-$caddyDataDirectory = [string]$config["ENTROPY_CADDY_DATA_DIR"]
-$logDirectory = [string]$config["ENTROPY_LOG_DIR"]
-if (-not $PSCmdlet.ShouldProcess($installDirectory, "Install Entropy public seed scheduled tasks")) {
+$installDirectory = [string]$config["ENTCOIN_INSTALL_DIR"]
+$dataDirectory = [string]$config["ENTCOIN_DATA_DIR"]
+$caddyDataDirectory = [string]$config["ENTCOIN_CADDY_DATA_DIR"]
+$logDirectory = [string]$config["ENTCOIN_LOG_DIR"]
+if (-not $PSCmdlet.ShouldProcess($installDirectory, "Install Entcoin public seed scheduled tasks")) {
     return
 }
 
@@ -116,7 +116,7 @@ try {
     foreach ($directory in @($installDirectory, $dataDirectory, $caddyDataDirectory, $logDirectory)) {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
     }
-    Copy-Item -LiteralPath $EntropyCliPath -Destination (Join-Path $installDirectory "entropy-cli.exe") -Force
+    Copy-Item -LiteralPath $EntcoinCliPath -Destination (Join-Path $installDirectory "entcoin-cli.exe") -Force
     Copy-Item -LiteralPath $CaddyPath -Destination (Join-Path $installDirectory "caddy.exe") -Force
     foreach ($name in @("Caddyfile", "seed-config.ps1", "run-node.ps1", "run-proxy.ps1", "health-check.ps1")) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $installDirectory $name) -Force
@@ -181,7 +181,7 @@ try {
         -User $nodeAccount `
         -Password $plainPassword `
         -RunLevel Limited `
-        -Description "Entropy walletless archive seed node under its dedicated service account" `
+        -Description "Entcoin walletless archive seed node under its dedicated service account" `
         -Force | Out-Null
     $plainPassword = $null
     $registeredTasks += $nodeTaskName
@@ -196,7 +196,7 @@ try {
         -Trigger $trigger `
         -Settings $settings `
         -Principal $proxyPrincipal `
-        -Description "Caddy HTTPS and WSS proxy for the Entropy archive seed" `
+        -Description "Caddy HTTPS and WSS proxy for the Entcoin archive seed" `
         -Force | Out-Null
     $registeredTasks += $proxyTaskName
 
@@ -214,7 +214,7 @@ try {
 
     if (-not $SkipStart) {
         Start-ScheduledTask -TaskName $nodeTaskName
-        Wait-ForLocalNode -Address ([string]$config["ENTROPY_LISTEN_ADDRESS"])
+        Wait-ForLocalNode -Address ([string]$config["ENTCOIN_LISTEN_ADDRESS"])
         Start-ScheduledTask -TaskName $proxyTaskName
         Start-Sleep -Seconds 2
         $proxyTask = Get-ScheduledTask -TaskName $proxyTaskName
@@ -223,8 +223,8 @@ try {
         }
     }
 
-    Write-Host "Installed Entropy seed tasks: $nodeTaskName, $proxyTaskName"
-    Write-Host "Public endpoint: https://$($config['ENTROPY_SEED_DOMAIN'])"
+    Write-Host "Installed Entcoin seed tasks: $nodeTaskName, $proxyTaskName"
+    Write-Host "Public endpoint: https://$($config['ENTCOIN_SEED_DOMAIN'])"
     Write-Host "Run health-check.ps1 after DNS and ACME certificate issuance are ready."
 }
 catch {

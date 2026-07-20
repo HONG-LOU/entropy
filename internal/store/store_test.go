@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"entropy/internal/core"
+	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
 func TestStateAndWalletRoundTrip(t *testing.T) {
