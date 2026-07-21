@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -126,6 +127,23 @@ test("homepage translation keys are all defined", async () => {
     assert.ok(translations.en[key], `missing English translation: ${key}`);
     assert.ok(translations.zh[key], `missing Chinese translation: ${key}`);
   }
+
+  const publicCopy = `${html}\n${Object.values(translations.en).join("\n")}\n${Object.values(translations.zh).join("\n")}`;
+  assert.doesNotMatch(publicCopy, /real-world value|no actual value|现实世界价值|没有实际价值|无实际价值/i);
+});
+
+test("website and desktop packages use the Entcoin E icon", async () => {
+  const [sourceIcon, websiteIcon, windowsIcon, favicon] = await Promise.all([
+    readFile(new URL("../../build/appicon.png", import.meta.url)),
+    readFile(new URL("../assets/appicon.png", import.meta.url)),
+    readFile(new URL("../../build/windows/icon.ico", import.meta.url)),
+    readFile(new URL("../favicon.ico", import.meta.url)),
+  ]);
+
+  assert.equal(createHash("sha256").update(sourceIcon).digest("hex"), "20ed760a9bc8d6f65ebcc55570647aee499d372b34cb50fda344dabd05141df3");
+  assert.deepEqual(websiteIcon, sourceIcon);
+  assert.equal(createHash("sha256").update(windowsIcon).digest("hex"), "10495951579e22b12714c0974658029d53ffa6fbdd8a0a3b90a69cf322a94103");
+  assert.deepEqual(favicon, windowsIcon);
 });
 
 test("visual system includes responsive and accessibility contracts", async () => {
@@ -150,6 +168,7 @@ test("visual system includes responsive and accessibility contracts", async () =
   assert.doesNotMatch(css, /font-size\s*:[^;]*vw/i);
   assert.doesNotMatch(css, /border-radius\s*:\s*(?:[1-9]\d|\d{3,})px/i);
   assert.match(css, /\.hero\s*{[^}]*position:\s*relative/s);
+  assert.match(css, /\.security-band\s*{[^}]*background:\s*var\(--mint\)/s);
 });
 
 test("browser module wires language, live data, menus, and motion preferences", async () => {

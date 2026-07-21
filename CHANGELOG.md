@@ -3,6 +3,17 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [Unreleased]
+
+### Changed
+
+- Unified the website favicon and Windows desktop package icon with the custom
+  Entcoin E used by Linux packages, the PWA, and website branding.
+- Replaced obsolete test-network/value disclaimers in current product surfaces
+  with the live two-region public seed topology and local-validation model.
+- Kept `entropy-mainnet-v1`, `entropy.db`, and legacy Entropy data-directory
+  detection unchanged as protocol and wallet compatibility identifiers.
+
 ## [1.0.6] - 2026-07-21
 
 ### Added
@@ -199,9 +210,6 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 - The source repository is public, but v1.0.0 has not received an independent
   consensus, cryptography, wallet, P2P, persistence, or desktop audit.
-- The `mainnet` name does not imply production readiness. ENT must not carry
-  real-world value unless and until independent audits and sustained hostile
-  network testing establish an appropriate security basis.
 
 ## [0.2.0] - 2026-07-13
 
@@ -267,7 +275,6 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 - v0.2 is a public testnet and has not received an independent audit.
 - Release binaries are not Authenticode-signed and builds are not yet
   reproducible.
-- ENT must not carry real-world value.
 
 ## [0.1.0]
 

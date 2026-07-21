@@ -1,13 +1,10 @@
 # Security policy
 
-## Mainnet warning
+## Mainnet scope
 
 Entcoin v1.0.6 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
-not mean the implementation is independently audited or production-safe. ENT
-must not represent money, deposits, securities, redeemable claims, or any other
-asset with real-world value unless and until independent audits establish an
-appropriate security basis.
+not mean the implementation has received an independent security audit.
 
 Cryptographic primitives and proof of work do not by themselves make a new
 blockchain economically or operationally secure. Independent review, sustained
@@ -18,7 +15,7 @@ still required.
 
 | Version | Status |
 | --- | --- |
-| `1.0.x` | Current unaudited mainnet-identity line; security fixes accepted |
+| `1.0.x` | Current mainnet line; security fixes accepted |
 | `0.2.x` | Historical public testnet; unsupported |
 | `0.1.x` | Educational testnet MVP; unsupported |
 

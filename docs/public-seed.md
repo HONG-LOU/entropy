@@ -230,5 +230,5 @@ wallet, chain, certificates, and logs:
 `-RemoveRuntimeData` permanently removes all retained runtime directories and
 must be used only after wallet recovery is verified.
 
-Entcoin has not received an independent security or consensus audit. ENT must
-not carry real-world value.
+Public seeds improve reachability but never replace validation performed by each
+Entcoin node.

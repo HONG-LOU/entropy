@@ -5,11 +5,9 @@ identity is `entropy-mainnet-v1`. The HTTP path prefix remains `/v2` because it
 denotes the second transport design; endpoint numbering and network identity
 are not the same version counter.
 
-The network identity is the genesis and consensus compatibility boundary, not
-an audit claim. This protocol may change incompatibly in a later release, is not
-an authenticated payment API, and has not received an independent security
-audit. ENT must not carry real-world value without appropriate independent
-audits.
+The network identity is the genesis and consensus compatibility boundary. This
+protocol may change incompatibly in a later release, is not an authenticated
+payment API, and has not received an independent security audit.
 
 ## Consensus anchor and domain separation
 

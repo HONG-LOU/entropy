@@ -1119,8 +1119,8 @@ canvas {
 }
 
 .security-band {
-  background: var(--amber);
-  color: #17130a;
+  background: var(--mint);
+  color: #08140f;
 }
 
 .security-layout {

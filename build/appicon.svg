@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">Entcoin application icon</title>
-  <desc id="desc">A fractured letter E representing ordered value emerging from entropy.</desc>
+  <desc id="desc">A fractured letter E representing an independently verified chain.</desc>
   <rect x="48" y="48" width="928" height="928" rx="208" fill="#121716"/>
   <path d="M278 246h438l-42 132H438v91h204l-38 120H438v57h210l-43 132H278V246Z" fill="#F4F2EA"/>
   <path d="M700 246h78l-42 132h-78l42-132Z" fill="#37D67A"/>

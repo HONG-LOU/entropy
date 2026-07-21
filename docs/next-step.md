@@ -10,7 +10,7 @@
   long-lived adversarial networks with independent miners and operators.
 - Commission independent consensus, cryptography, wallet, P2P, persistence,
   installer, and desktop-boundary audits. Publish findings and resolve every
-  critical issue before ENT is used to carry real-world value.
+  critical issue.
 - Establish miner and operator diversity, reorganization and hash-rate alerts,
   public incident channels, and a versioned emergency upgrade, rollback, and
   governance process.

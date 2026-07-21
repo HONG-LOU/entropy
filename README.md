@@ -6,11 +6,8 @@ ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
 database server, browser tab, or background daemon.
 
-> `entropy-mainnet-v1` is a genesis and consensus compatibility identifier, not
-> an audit or production-security claim. Entcoin has not received an independent
-> security or consensus audit. ENT must not be bought, sold, redeemed, or used
-> to carry real-world value unless and until appropriate independent audits
-> establish a suitable security basis.
+> `entropy-mainnet-v1` is the compatibility identifier retained by the Entcoin
+> mainnet so existing nodes, wallets, and chain data continue to interoperate.
 
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entcoin>.
@@ -105,9 +102,9 @@ The mainnet data directory for a clean installation is:
 The per-user uninstaller removes the application but deliberately keeps this
 directory, including the wallet and chain. Back it up before deleting it
 manually. Historical `%APPDATA%\Entropy` and `%LOCALAPPDATA%\Entropy` testnet
-state is never selected as mainnet state. Existing Entropy mainnet directories
-are detected and reused so the rename cannot hide a wallet. Do not copy a
-testnet database or chain file into `mainnet-v1`.
+state is never selected as mainnet state. Existing legacy mainnet directories
+are detected and reused so the product rename cannot hide a wallet. Do not copy
+a testnet database or chain file into `mainnet-v1`.
 
 A new desktop ledger starts in pruned mode retaining the newest 20,000 complete
 block bodies. Later launches respect the storage policy persisted in that

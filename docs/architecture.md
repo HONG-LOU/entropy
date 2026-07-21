@@ -7,10 +7,9 @@ one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
 The phrase "full node" means that the node independently verifies consensus
-rules before changing its active ledger. It does not mean the implementation
-has been independently audited or is safe for real-value assets. Here,
-`mainnet` is only a genesis and consensus compatibility identifier. ENT must
-not carry real-world value without appropriate independent audits.
+rules before changing its active ledger. The retained `entropy-mainnet-v1`
+identifier is the compatibility boundary for the Entcoin genesis and consensus
+rules.
 
 ## Process layout
 
@@ -386,8 +385,7 @@ built-in node-side transport encryption, automatic NAT traversal, signed
 binaries, reproducible builds, or a mature protocol-upgrade process. HTTPS
 manifest delivery and the optional reverse-proxied seed package help discovery
 and transport deployment; they are not audit evidence or consensus authorities,
-and the checked-in manifest does not claim an active seed. P-256 and the compact
-fast-chain DAA are project-specific design choices, not claims of Bitcoin
-compatibility. ENT must not carry real-world value without appropriate
-independent audits. Read [SECURITY.md](../SECURITY.md) before exposing a node or
-handling wallet material.
+and the two published archive seeds do not override local validation. P-256 and
+the compact fast-chain DAA are project-specific design choices, not claims of
+Bitcoin compatibility. Read [SECURITY.md](../SECURITY.md) before exposing a node
+or handling wallet material.

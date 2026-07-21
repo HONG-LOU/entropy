@@ -2,9 +2,8 @@
 
 This guide covers the v1.0.6 Windows/Ubuntu desktop node, headless CLI, and
 optional public-seed deployment. The network identity is
-`entropy-mainnet-v1`, but that is a compatibility label rather than an audit or
-production-safety claim. ENT must not carry real-world value without
-appropriate independent audits.
+`entropy-mainnet-v1`; this compatibility label keeps existing Entcoin nodes,
+wallets, and chain data on the same network.
 
 ## Install and launch
 
@@ -37,8 +36,8 @@ The fresh desktop ledger retains the newest 20,000 complete block bodies. Later
 launches respect the storage mode already persisted in the database.
 
 Historical testnet state under `%APPDATA%\Entropy` or
-`%LOCALAPPDATA%\Entropy` is never reused as mainnet state. Existing Entropy
-mainnet directories are detected and reused so the rename cannot hide a
+`%LOCALAPPDATA%\Entropy` is never reused as mainnet state. Existing legacy
+mainnet directories are detected and reused so the product rename cannot hide a
 wallet. Testnet chains and databases must stay outside `mainnet-v1`.
 
 The desktop prefers TCP `47821`. If another process already owns that port it
@@ -540,5 +539,4 @@ the login keyring is absent or locked; unlock it rather than deleting
 Opening TCP `47821` exposes a deliberately public P2P parser to untrusted input.
 The implementation applies message, connection, and timeout limits, but has not
 been independently audited. Keep the operating system patched, run as a normal
-user, keep wallet backups offline, do not assign real-world value to ENT, and
-read [the security policy](../SECURITY.md).
+user, keep wallet backups offline, and read [the security policy](../SECURITY.md).
