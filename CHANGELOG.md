@@ -5,6 +5,13 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-07-21
+
+### Changed
+
+- Maintenance release used to verify the bounded in-app update path introduced
+  in v1.0.13 from an already-fixed desktop client.
+
 ## [1.0.13] - 2026-07-21
 
 ### Fixed
