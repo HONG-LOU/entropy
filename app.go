@@ -4,25 +4,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/HONG-LOU/entcoin/internal/core"
 	"github.com/HONG-LOU/entcoin/internal/ledger"
 	"github.com/HONG-LOU/entcoin/internal/node"
+	"github.com/HONG-LOU/entcoin/internal/updater"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
-	mu      sync.RWMutex
-	startMu sync.Mutex
-	wait    sync.WaitGroup
-	service *node.Service
-	start   error
-	ctx     context.Context
-	cancel  context.CancelFunc
-	closing bool
+	mu       sync.RWMutex
+	startMu  sync.Mutex
+	wait     sync.WaitGroup
+	service  *node.Service
+	start    error
+	ctx      context.Context
+	cancel   context.CancelFunc
+	closing  bool
+	updating bool
+	updater  *updater.Client
 }
 
 type ActionResult struct {
@@ -37,7 +41,7 @@ type StartupState struct {
 }
 
 func NewApp() *App {
-	return &App{}
+	return &App{updater: updater.New()}
 }
 
 func (a *App) focusWindow() {
@@ -139,6 +143,69 @@ func (a *App) GetDashboard() (node.Dashboard, error) {
 		return node.Dashboard{}, err
 	}
 	return service.Dashboard()
+}
+
+func (a *App) CheckForUpdate() (updater.Status, error) {
+	a.mu.RLock()
+	ctx := a.ctx
+	closing := a.closing
+	a.mu.RUnlock()
+	if closing {
+		return updater.Status{}, fmt.Errorf("application is shutting down")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	checkContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return a.updater.Check(checkContext)
+}
+
+func (a *App) OpenReleasePage() {
+	a.mu.RLock()
+	ctx := a.ctx
+	closing := a.closing
+	a.mu.RUnlock()
+	if ctx != nil && !closing {
+		wailsruntime.BrowserOpenURL(ctx, updater.ReleasesURL)
+	}
+}
+
+func (a *App) InstallUpdate() (ActionResult, error) {
+	a.mu.Lock()
+	if a.closing {
+		a.mu.Unlock()
+		return ActionResult{}, fmt.Errorf("application is shutting down")
+	}
+	if a.updating {
+		a.mu.Unlock()
+		return ActionResult{}, fmt.Errorf("an update is already being prepared")
+	}
+	a.updating = true
+	ctx := a.ctx
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		a.updating = false
+		a.mu.Unlock()
+	}()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	prepared, err := a.updater.PrepareLatest(ctx)
+	if err != nil {
+		return ActionResult{}, err
+	}
+	if err := updater.LaunchInstaller(prepared.Path); err != nil {
+		return ActionResult{}, err
+	}
+	if runtime.GOOS == "windows" {
+		go func() {
+			time.Sleep(time.Second)
+			wailsruntime.Quit(ctx)
+		}()
+	}
+	return ActionResult{Message: fmt.Sprintf("Entcoin %s installer opened", prepared.Status.LatestVersion)}, nil
 }
 
 func (a *App) GetStartupState() StartupState {

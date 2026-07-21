@@ -1,4 +1,4 @@
-export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.5";
+export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.6";
 
 const en = {
   "meta.title": "Entcoin — Run the network. Verify everything.",
@@ -89,7 +89,7 @@ const en = {
   "download.cli.action": "CLI downloads",
   "download.checksums": "Checksums",
   "download.release": "View release notes",
-  "download.boundary": "v1.0.5 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
+  "download.boundary": "v1.0.6 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
   "infrastructure.eyebrow": "05 / Live infrastructure",
   "infrastructure.title": "Inspect the public node.",
   "infrastructure.body": "This page reads the same bounded status endpoint other nodes use. No market ticker and no fabricated activity.",
@@ -215,7 +215,7 @@ const zh = {
   "download.cli.action": "CLI 下载",
   "download.checksums": "校验值",
   "download.release": "查看版本说明",
-  "download.boundary": "v1.0.5 尚未签名，可能触发 SmartScreen。请核对发布的 SHA-256 校验值，并了解校验值不能证明发布者身份。",
+  "download.boundary": "v1.0.6 尚未签名，可能触发 SmartScreen。请核对发布的 SHA-256 校验值，并了解校验值不能证明发布者身份。",
   "infrastructure.eyebrow": "05 / 实时基础设施",
   "infrastructure.title": "检查公共节点。",
   "infrastructure.body": "本页读取其他节点使用的同一个有界状态接口，没有行情计价，也没有伪造活动。",
@@ -342,7 +342,7 @@ function findAsset(assets, pattern) {
 
 function fallbackRelease() {
   return {
-    version: "v1.0.5",
+    version: "v1.0.6",
     release: FALLBACK_RELEASE_URL,
     windowsPortable: FALLBACK_RELEASE_URL,
     windowsInstaller: FALLBACK_RELEASE_URL,

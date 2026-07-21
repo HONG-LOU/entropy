@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File website/tools/generate-social-preview.p
 
 - Protocol and implementation claims are derived from the repository docs.
 - The same-origin status endpoint accepts only `entropy-mainnet-v1` responses.
-- Release links are pinned to the verified v1.0.5 assets in the official GitHub repository.
+- Release links are pinned to the verified v1.0.6 assets in the official GitHub repository.
 - The security section must retain the unaudited and no-real-world-value warning.
 
 ## Production layout

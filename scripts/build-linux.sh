@@ -12,6 +12,13 @@ bin="$project/build/bin"
 stage=$(mktemp -d "${TMPDIR:-/tmp}/entcoin-linux-package.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 
+command -v node >/dev/null || { echo "Node.js 22 is required" >&2; exit 1; }
+project_version=$(node -p "require('$project/frontend/package.json').version")
+if [[ $version != "$project_version" ]]; then
+    echo "release version $version does not match project version $project_version" >&2
+    exit 1
+fi
+
 command -v go >/dev/null || { echo "Go 1.26.5 is required" >&2; exit 1; }
 go version | grep -q 'go1\.26\.5' || { echo "Go 1.26.5 is required" >&2; exit 1; }
 command -v wails >/dev/null || { echo "Wails v2.13.0 is required" >&2; exit 1; }

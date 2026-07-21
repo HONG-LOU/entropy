@@ -3,6 +3,33 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [1.0.6] - 2026-07-21
+
+### Added
+
+- A desktop software-update surface that checks the official GitHub Release,
+  selects the current platform installer, downloads it into the user cache,
+  verifies it against the matching SHA-256 release manifest, and opens the
+  operating-system installer for explicit user approval.
+
+### Fixed
+
+- Recoverable WebSocket peer reconcile failures remain attached to the failed
+  peer instead of permanently changing the desktop node state to `Node warning`.
+
+### Security
+
+- Update metadata and artifacts are bounded, accepted only from trusted GitHub
+  HTTPS hosts, matched to exact release asset names, and verified before launch.
+- v1.0.6 Windows artifacts remain unsigned and may trigger Microsoft Defender
+  SmartScreen; the updater does not bypass operating-system trust prompts.
+
+### Compatibility
+
+- Consensus identity `entropy-mainnet-v1`, blocks, transactions, addresses,
+  wallets, vaults, database layout, and peer protocol are unchanged from
+  v1.0.0-v1.0.5.
+
 ## [1.0.5] - 2026-07-21
 
 ### Added

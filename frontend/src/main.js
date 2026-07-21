@@ -93,6 +93,10 @@ const state = {
   pendingRemoveWallet: "",
   lastDashboardError: "",
   lastHistoryRefresh: 0,
+  updateStatus: null,
+  updateChecked: false,
+  updateChecking: false,
+  updateInstalling: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -591,6 +595,56 @@ async function refreshDashboard() {
   }
 }
 
+function renderUpdate(status) {
+  state.updateStatus = status;
+  state.updateChecked = true;
+  setText("current-version", `v${status.current_version || "1.0.6"}`);
+  const available = Boolean(status.available);
+  setText("update-status", available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date");
+  $("install-update").hidden = !available;
+  $("open-update").hidden = !available;
+  setText("open-update-label", available ? `Update v${status.latest_version}` : "Update available");
+}
+
+async function checkForUpdates(manual = false) {
+  if (state.updateChecking || state.updateInstalling) return;
+  state.updateChecking = true;
+  const button = $("check-update");
+  setButtonBusy(button, true, "Checking");
+  setText("update-status", "Checking GitHub releases");
+  try {
+    const status = await invoke("CheckForUpdate");
+    renderUpdate(status);
+    if (manual) showToast(status.available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date", "info");
+  } catch (error) {
+    state.updateChecked = true;
+    setText("update-status", "Update check unavailable");
+    if (manual) showToast(errorMessage(error), "error");
+  } finally {
+    state.updateChecking = false;
+    setButtonBusy(button, false);
+  }
+}
+
+async function installUpdate() {
+  if (state.updateInstalling) return;
+  state.updateInstalling = true;
+  const button = $("install-update");
+  setButtonBusy(button, true, "Downloading");
+  setText("update-status", "Downloading and verifying the update");
+  try {
+    const result = await invoke("InstallUpdate");
+    setText("update-status", result.message || "System installer opened");
+    showToast(result.message || "System installer opened");
+  } catch (error) {
+    setText("update-status", "Update installation did not start");
+    showToast(errorMessage(error), "error");
+  } finally {
+    state.updateInstalling = false;
+    setButtonBusy(button, false);
+  }
+}
+
 function detailValue(label, value, asCode = false) {
   const wrapper = document.createElement("div");
   const term = document.createElement("dt");
@@ -740,6 +794,7 @@ async function checkStartup() {
       state.ready = true;
       $("startup-overlay").classList.remove("visible");
       await Promise.all([refreshDashboard(), refreshHistory()]);
+      void checkForUpdates(false);
       return;
     }
     $("startup-overlay").classList.add("visible");
@@ -771,6 +826,7 @@ function activateView(name) {
     panel.classList.toggle("active", active);
   }
   if (name === "transactions") refreshHistory(true);
+  if (name === "diagnostics" && !state.updateChecked) void checkForUpdates(false);
 }
 
 function clearSensitive(dialog) {
@@ -854,6 +910,10 @@ document.querySelectorAll("dialog").forEach((dialog) => {
 $("copy-address").addEventListener("click", () => copyText(state.dashboard?.address, "Address copied"));
 $("copy-wallet-page-address").addEventListener("click", () => copyText(state.dashboard?.address, "Address copied"));
 $("copy-database-path").addEventListener("click", () => copyText(state.dashboard?.database_path, "Database path copied"));
+$("open-release-page").addEventListener("click", () => invoke("OpenReleasePage"));
+$("check-update").addEventListener("click", () => checkForUpdates(true));
+$("install-update").addEventListener("click", installUpdate);
+$("open-update").addEventListener("click", () => activateView("diagnostics"));
 
 $("send-form").addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -389,7 +389,6 @@ func (p *peerSocket) maybeStartReconcile() {
 		delay := max(time.Duration(0), time.Until(p.reconcileNext))
 		p.stateMu.Unlock()
 		if closePeer {
-			p.service.setError(fmt.Errorf("peer reconcile failed: %w", err))
 			p.penalize(err)
 			p.close()
 			return

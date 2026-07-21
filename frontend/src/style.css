@@ -43,7 +43,7 @@ svg { stroke-width: 1.8; }
   border-bottom: 3px solid var(--green-bright);
 }
 
-.brand-block, .node-state, .copy-row, .balance-line, .panel-heading, .section-heading,
+.brand-block, .topbar-actions, .node-state, .copy-row, .balance-line, .panel-heading, .section-heading,
 .mining-readout, .button-row, .inline-form, .supply-row, .view-heading, .history-summary,
 .wallet-identity, .modal-heading, .modal-heading > div, .startup-brand, .password-status,
 .security-state, .health-label, .network-risk-notice, .check-control { display: flex; align-items: center; }
@@ -63,6 +63,10 @@ svg { stroke-width: 1.8; }
 }
 .brand-block strong { display: block; font-size: 16px; line-height: 19px; }
 .brand-block span { display: block; color: #aeb7b3; font-size: 11px; line-height: 15px; }
+.topbar-actions { min-width: 0; gap: 12px; }
+.topbar-update { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; color: #dff5e9; background: #225e45; border: 1px solid #39775c; border-radius: 4px; font-size: 10px; font-weight: 750; }
+.topbar-update:hover { background: #2b7255; }
+.topbar-update svg { width: 13px; height: 13px; }
 .node-state { min-width: 0; gap: 8px; color: #d5dad8; font-size: 12px; }
 .node-state code { max-width: 360px; margin-left: 8px; overflow: hidden; color: #8f9a95; text-overflow: ellipsis; white-space: nowrap; }
 .status-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #4ac684; box-shadow: 0 0 0 3px rgba(74, 198, 132, 0.14); }
@@ -374,6 +378,14 @@ td code { color: var(--green); }
 .wallet-action-row strong { font-size: 12px; }
 .wallet-action-row div > span { margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
+.update-surface { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-bottom: 16px; }
+.update-copy { min-width: 0; }
+.update-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.update-title h2 { margin: 0; }
+.update-title code { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+.update-copy > strong { display: block; margin-top: 8px; font-size: 12px; }
+.update-actions { display: flex; align-items: center; gap: 7px; }
+.update-actions button { white-space: nowrap; }
 .diagnostic-surface { padding-top: 5px; padding-bottom: 5px; }
 .diagnostic-list { margin: 0; }
 .diagnostic-list > div { min-height: 50px; display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: center; gap: 18px; border-bottom: 1px solid var(--soft-line); }
@@ -467,12 +479,16 @@ dialog.modal[open] { display: grid; place-items: center; }
   .metrics { grid-template-columns: repeat(3, 1fr); row-gap: 16px; }
   .metric:nth-child(4) { padding-left: 0; border-left: 0; }
   .node-state code { max-width: 220px; }
+  .update-surface { grid-template-columns: auto minmax(0, 1fr); }
+  .update-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .prune-surface { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 680px) {
 	.transaction-overview, .transaction-io-grid { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
+  .topbar-update span { display: none; }
+  .topbar-update { width: 30px; justify-content: center; padding: 0; }
   .node-state code { display: none; }
   .workspace { padding-right: 14px; padding-left: 14px; }
   .view-tabs { margin-bottom: 17px; }
@@ -488,6 +504,10 @@ dialog.modal[open] { display: grid; place-items: center; }
   .peer-form { width: 100%; }
   .diagnostic-list > div { grid-template-columns: 1fr; gap: 5px; padding: 10px 0; }
   .diagnostic-list dd { text-align: left; }
+  .update-surface { grid-template-columns: 1fr; }
+  .update-surface > .action-icon { display: none; }
+  .update-actions { grid-column: auto; align-items: stretch; flex-direction: column; }
+  .update-actions button { width: 100%; }
   .prune-form .inline-form { align-items: stretch; flex-direction: column; }
   .prune-buttons { width: 100%; }
   .prune-buttons button { min-width: 0; flex: 1; }

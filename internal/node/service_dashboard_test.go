@@ -1,6 +1,9 @@
 package node
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestChainSyncInProgressRequiresAheadPeer(t *testing.T) {
 	tests := []struct {
@@ -22,5 +25,25 @@ func TestChainSyncInProgressRequiresAheadPeer(t *testing.T) {
 				t.Fatalf("chainSyncInProgress() = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestPeerFailureDoesNotBecomeNodeWarning(t *testing.T) {
+	const peerURL = "https://peer.example"
+	service := &Service{
+		peers:           map[string]*peerState{peerURL: {Online: true}},
+		activeOutbound:  map[string]struct{}{peerURL: {}},
+		outboundSockets: make(map[string]*peerSocket),
+	}
+
+	service.markPeerFailure(peerURL, errors.New("peer channel is unavailable"))
+
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	if service.lastError != "" {
+		t.Fatalf("peer failure became node warning: %q", service.lastError)
+	}
+	if service.peers[peerURL].LastError == "" {
+		t.Fatal("peer failure was not retained on the peer")
 	}
 }
