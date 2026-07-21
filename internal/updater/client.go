@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	CurrentVersion    = "1.0.9"
+	CurrentVersion    = "1.0.10"
 	ReleasesURL       = "https://github.com/HONG-LOU/entcoin/releases/latest"
 	releaseFeedURL    = "https://github.com/HONG-LOU/entcoin/releases.atom"
 	updateManifestURL = "https://entcoin.xyz/update.json"
@@ -43,6 +43,15 @@ type PreparedUpdate struct {
 	Status Status
 	Path   string
 }
+
+type Progress struct {
+	Phase      string `json:"phase"`
+	Downloaded int64  `json:"downloaded"`
+	Total      int64  `json:"total"`
+	Percent    int    `json:"percent"`
+}
+
+type ProgressReporter func(Progress)
 
 type Client struct {
 	feedURL      string
@@ -108,7 +117,8 @@ func (c *Client) Check(ctx context.Context) (Status, error) {
 	return selection.status, nil
 }
 
-func (c *Client) PrepareLatest(ctx context.Context) (PreparedUpdate, error) {
+func (c *Client) PrepareLatest(ctx context.Context, report ProgressReporter) (PreparedUpdate, error) {
+	reportProgress(report, "preparing", 0, 0)
 	selection, err := c.latest(ctx)
 	if err != nil {
 		return PreparedUpdate{}, err
@@ -124,7 +134,7 @@ func (c *Client) PrepareLatest(ctx context.Context) (PreparedUpdate, error) {
 	if err != nil {
 		return PreparedUpdate{}, err
 	}
-	path, err := c.downloadArtifact(ctx, selection.artifact, expected)
+	path, err := c.downloadArtifact(ctx, selection.artifact, expected, report)
 	if err != nil {
 		return PreparedUpdate{}, err
 	}
@@ -278,7 +288,12 @@ func (c *Client) readOnce(ctx context.Context, address string, limit int64) ([]b
 	return data, nil
 }
 
-func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expected string) (string, error) {
+func (c *Client) downloadArtifact(
+	ctx context.Context,
+	asset releaseAsset,
+	expected string,
+	report ProgressReporter,
+) (string, error) {
 	cacheRoot := c.cacheRoot
 	if cacheRoot == "" {
 		userCache, err := os.UserCacheDir()
@@ -294,6 +309,7 @@ func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expec
 	if valid, err := fileMatches(destination, expected); err != nil {
 		return "", err
 	} else if valid {
+		reportProgress(report, "verifying", 1, 1)
 		return destination, nil
 	}
 
@@ -317,6 +333,7 @@ func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expec
 	if response.ContentLength > maxArtifactBytes {
 		return "", errors.New("download update: response exceeds the maximum artifact size")
 	}
+	reportProgress(report, "downloading", 0, response.ContentLength)
 
 	temporary, err := os.CreateTemp(cacheRoot, ".entcoin-update-*")
 	if err != nil {
@@ -325,7 +342,12 @@ func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expec
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
 	hash := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(temporary, hash), io.LimitReader(response.Body, maxArtifactBytes+1))
+	progress := &progressWriter{
+		writer: io.MultiWriter(temporary, hash),
+		total:  response.ContentLength,
+		report: report,
+	}
+	written, copyErr := io.Copy(progress, io.LimitReader(response.Body, maxArtifactBytes+1))
 	closeErr := temporary.Close()
 	if copyErr != nil {
 		return "", fmt.Errorf("write update file: %w", copyErr)
@@ -336,6 +358,7 @@ func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expec
 	if written > maxArtifactBytes || (response.ContentLength >= 0 && written != response.ContentLength) {
 		return "", errors.New("downloaded update size does not match the HTTP response")
 	}
+	reportProgress(report, "verifying", written, response.ContentLength)
 	actual := hex.EncodeToString(hash.Sum(nil))
 	if actual != expected {
 		return "", errors.New("downloaded update failed SHA-256 verification")
@@ -350,6 +373,47 @@ func (c *Client) downloadArtifact(ctx context.Context, asset releaseAsset, expec
 		return "", fmt.Errorf("store verified update: %w", err)
 	}
 	return destination, nil
+}
+
+type progressWriter struct {
+	writer      io.Writer
+	total       int64
+	downloaded  int64
+	lastPercent int
+	report      ProgressReporter
+}
+
+func (w *progressWriter) Write(data []byte) (int, error) {
+	written, err := w.writer.Write(data)
+	w.downloaded += int64(written)
+	percent := progressPercent(w.downloaded, w.total)
+	if percent != w.lastPercent || w.total <= 0 {
+		w.lastPercent = percent
+		reportProgress(w.report, "downloading", w.downloaded, w.total)
+	}
+	return written, err
+}
+
+func reportProgress(reporter ProgressReporter, phase string, downloaded, total int64) {
+	if reporter == nil {
+		return
+	}
+	reporter(Progress{
+		Phase:      phase,
+		Downloaded: downloaded,
+		Total:      total,
+		Percent:    progressPercent(downloaded, total),
+	})
+}
+
+func progressPercent(downloaded, total int64) int {
+	if total <= 0 || downloaded <= 0 {
+		return 0
+	}
+	if downloaded >= total {
+		return 100
+	}
+	return int(downloaded * 100 / total)
 }
 
 func secureHTTPClient() *http.Client {

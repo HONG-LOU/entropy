@@ -39,8 +39,9 @@ import {
   X,
   createIcons,
 } from "lucide";
+import { EventsOn } from "../wailsjs/runtime/runtime.js";
 import "./style.css";
-import { filterTransactions, transactionKind } from "./transaction-filter.js";
+import { transactionKind } from "./transaction-filter.js";
 import { currentLocale, initializeI18n, onLanguageChange, toggleLanguage, translate, translateError } from "./i18n.js";
 
 const appIcons = {
@@ -93,6 +94,7 @@ const state = {
   startupChecking: false,
   dashboardRefreshing: false,
   historyRefreshing: false,
+  historyRefreshQueued: false,
   recoveryPhrase: "",
   pendingPruneRetain: 0,
   pendingRemoveWallet: "",
@@ -214,6 +216,40 @@ function setButtonBusy(button, busy, busyLabel = "Working") {
     delete button.dataset.busyLabel;
     button.classList.remove("button-busy");
     button.disabled = false;
+  }
+}
+
+function resetUpdateProgress() {
+  const button = $("install-update");
+  button?.classList.remove("update-progress");
+  button?.style.removeProperty("--update-progress");
+}
+
+function renderUpdateProgress(progress) {
+  if (!state.updateInstalling) return;
+  const button = $("install-update");
+  const label = button?.querySelector("span");
+  const phase = String(progress?.phase || "");
+  if (phase === "downloading") {
+    const percent = Math.min(100, Math.max(0, asNumber(progress.percent)));
+    button.classList.add("update-progress");
+    button.style.setProperty("--update-progress", `${percent}%`);
+    if (label) label.textContent = progress.total > 0 ? `Downloading ${percent}%` : "Downloading";
+    setText("update-status", progress.total > 0
+      ? `Downloaded ${formatBytes(progress.downloaded)} / ${formatBytes(progress.total)}`
+      : `${formatBytes(progress.downloaded)} downloaded`);
+    return;
+  }
+  resetUpdateProgress();
+  if (phase === "verifying") {
+    if (label) label.textContent = "Verifying";
+    setText("update-status", "Verifying downloaded update");
+  } else if (phase === "installing") {
+    if (label) label.textContent = "Installing";
+    setText("update-status", "Waiting for system approval");
+  } else {
+    if (label) label.textContent = "Preparing";
+    setText("update-status", "Preparing update");
   }
 }
 
@@ -517,26 +553,25 @@ function amountCell(value, className) {
 function renderHistory(transactions) {
   const body = $("history-body");
   body.replaceChildren();
-  const filtered = filterTransactions(transactions, state.historyFilter);
-  setText("history-count", filtered.length.toLocaleString(currentLocale()));
+  setText("history-count", transactions.length.toLocaleString(currentLocale()));
   setText("history-total", transactions.length.toLocaleString(currentLocale()));
 
-  if (filtered.length === 0) {
+  if (transactions.length === 0) {
     const row = body.insertRow();
     const cell = row.insertCell();
     cell.colSpan = 5;
     cell.className = "empty-cell";
     const emptyMessages = {
       all: "No wallet transactions yet",
-      received: "No received transactions in loaded history",
-      sent: "No sent transactions in loaded history",
-      mining: "No mining rewards in loaded history",
+      received: "No received transactions yet",
+      sent: "No sent transactions yet",
+      mining: "No mining rewards yet",
     };
     cell.textContent = emptyMessages[state.historyFilter] || emptyMessages.all;
     return;
   }
 
-  for (const transaction of filtered) {
+  for (const transaction of transactions) {
     const row = body.insertRow();
     row.className = "transaction-row";
     row.tabIndex = 0;
@@ -609,7 +644,7 @@ async function refreshDashboard() {
 function renderUpdate(status) {
   state.updateStatus = status;
   state.updateChecked = true;
-  setText("current-version", `v${status.current_version || "1.0.9"}`);
+  setText("current-version", `v${status.current_version || "1.0.10"}`);
   const available = Boolean(status.available);
   setText("update-status", available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date");
   $("install-update").hidden = !available;
@@ -641,8 +676,8 @@ async function installUpdate() {
   if (state.updateInstalling) return;
   state.updateInstalling = true;
   const button = $("install-update");
-  setButtonBusy(button, true, "Downloading");
-  setText("update-status", "Downloading and verifying the update");
+  setButtonBusy(button, true, "Preparing");
+  renderUpdateProgress({ phase: "preparing" });
   try {
     const result = await invoke("InstallUpdate");
     setText("update-status", result.message || "Update ready; restarting");
@@ -652,6 +687,7 @@ async function installUpdate() {
     showToast(errorMessage(error), "error");
   } finally {
     state.updateInstalling = false;
+    resetUpdateProgress();
     setButtonBusy(button, false);
   }
 }
@@ -754,22 +790,29 @@ function openTransactionDetails(transaction) {
 }
 
 async function refreshHistory(force = false) {
-  if (!state.ready || state.historyRefreshing) return;
+  if (!state.ready) return;
+  if (state.historyRefreshing) {
+    state.historyRefreshQueued = true;
+    return;
+  }
   state.historyRefreshing = true;
+  const requestedFilter = state.historyFilter;
   const button = $("refresh-history");
   if (force) {
     button.disabled = true;
     button.classList.add("button-busy");
   }
   try {
-    const history = asArray(await invoke("GetTransactionHistory", 100));
-    state.history = history;
-    state.lastHistoryRefresh = Date.now();
-    renderHistory(history);
-    setText("history-updated", `Updated ${new Intl.DateTimeFormat(currentLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`);
+    const history = asArray(await invoke("GetTransactionHistory", 100, requestedFilter));
+    if (requestedFilter === state.historyFilter) {
+      state.history = history;
+      state.lastHistoryRefresh = Date.now();
+      renderHistory(history);
+      setText("history-updated", `Updated ${new Intl.DateTimeFormat(currentLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`);
+    }
   } catch (error) {
     if (force || state.history.length === 0) showToast(errorMessage(error), "error");
-    if (state.history.length === 0) {
+    if (requestedFilter === state.historyFilter) {
       const body = $("history-body");
       body.replaceChildren();
       const row = body.insertRow();
@@ -783,6 +826,10 @@ async function refreshHistory(force = false) {
     if (force) {
       button.disabled = false;
       button.classList.remove("button-busy");
+    }
+    if (state.historyRefreshQueued) {
+      state.historyRefreshQueued = false;
+      void refreshHistory(true);
     }
   }
 }
@@ -937,7 +984,16 @@ document.querySelectorAll("[data-history-filter]").forEach((button) => {
       candidate.classList.toggle("active", active);
       candidate.setAttribute("aria-pressed", String(active));
     });
-    renderHistory(state.history);
+    const body = $("history-body");
+    body.replaceChildren();
+    setText("history-count", "0");
+    setText("history-total", "0");
+    const row = body.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 5;
+    cell.className = "empty-cell";
+    cell.textContent = "Loading transactions";
+    void refreshHistory(true);
   });
 });
 
@@ -1307,6 +1363,7 @@ async function heartbeat() {
 }
 
 initializeI18n();
+if (window.runtime?.EventsOnMultiple) EventsOn("entcoin:update-progress", renderUpdateProgress);
 onLanguageChange(() => {
   if (state.dashboard) renderDashboard(state.dashboard);
   if (state.history.length > 0) renderHistory(state.history);

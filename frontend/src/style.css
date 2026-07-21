@@ -253,6 +253,13 @@ input:not([type="checkbox"]):focus, textarea:focus { border-color: var(--green-b
 }
 .primary-button { color: #fff; background: var(--green); border: 1px solid var(--green); }
 .primary-button:hover { background: #12623f; border-color: #12623f; }
+.primary-button.update-progress,
+.primary-button.update-progress:hover {
+  background: linear-gradient(90deg, #176c49 0 var(--update-progress), #3c8565 var(--update-progress) 100%);
+  border-color: #176c49;
+}
+.primary-button.update-progress:disabled { cursor: wait; opacity: 1; }
+.button-busy.update-progress svg { animation: none; }
 .primary-button.danger, .danger-button { color: #fff; background: var(--red); border: 1px solid var(--red); }
 .primary-button.danger:hover, .danger-button:hover { background: #9d392b; border-color: #9d392b; }
 .secondary-button { color: #35403b; background: #fff; border: 1px solid #cfd5d2; }
@@ -408,6 +415,7 @@ td code { color: var(--green); }
 .update-copy > strong { display: block; margin-top: 8px; font-size: 12px; }
 .update-actions { display: flex; align-items: center; gap: 7px; }
 .update-actions button { white-space: nowrap; }
+#install-update { min-width: 166px; }
 .diagnostic-surface { padding-top: 5px; padding-bottom: 5px; }
 .diagnostic-list { margin: 0; }
 .diagnostic-list > div { min-height: 50px; display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: center; gap: 18px; border-bottom: 1px solid var(--soft-line); }

@@ -1021,6 +1021,10 @@ func (s *Service) StopMining() {
 }
 
 func (s *Service) TransactionHistory(limit int) ([]TransactionSummary, error) {
+	return s.FilteredTransactionHistory(limit, string(ledger.TransactionHistoryAll))
+}
+
+func (s *Service) FilteredTransactionHistory(limit int, filter string) ([]TransactionSummary, error) {
 	if limit <= 0 || limit > 500 {
 		return nil, fmt.Errorf("history limit must be between 1 and 500")
 	}
@@ -1034,7 +1038,12 @@ func (s *Service) TransactionHistory(limit int) ([]TransactionSummary, error) {
 	address := s.wallet.Address
 	s.mu.Unlock()
 	defer s.wait.Done()
-	records, err := chain.TransactionHistory(context.Background(), address, limit)
+	records, err := chain.FilteredTransactionHistory(
+		context.Background(),
+		address,
+		limit,
+		ledger.TransactionHistoryFilter(filter),
+	)
 	if err != nil {
 		return nil, err
 	}

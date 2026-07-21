@@ -191,10 +191,13 @@ func (a *App) InstallUpdate() (ActionResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	prepared, err := a.updater.PrepareLatest(ctx)
+	prepared, err := a.updater.PrepareLatest(ctx, func(progress updater.Progress) {
+		wailsruntime.EventsEmit(ctx, "entcoin:update-progress", progress)
+	})
 	if err != nil {
 		return ActionResult{}, err
 	}
+	wailsruntime.EventsEmit(ctx, "entcoin:update-progress", updater.Progress{Phase: "installing", Percent: 100})
 	if err := updater.LaunchInstaller(prepared.Path); err != nil {
 		return ActionResult{}, err
 	}
@@ -312,12 +315,12 @@ func (a *App) RemovePeer(peer string) (ActionResult, error) {
 	return ActionResult{Message: "Peer removed"}, nil
 }
 
-func (a *App) GetTransactionHistory(limit int) ([]node.TransactionSummary, error) {
+func (a *App) GetTransactionHistory(limit int, filter string) ([]node.TransactionSummary, error) {
 	service, err := a.readyService()
 	if err != nil {
 		return nil, err
 	}
-	return service.TransactionHistory(limit)
+	return service.FilteredTransactionHistory(limit, filter)
 }
 
 func (a *App) PruneLedger(retainRecent uint64) (ActionResult, error) {

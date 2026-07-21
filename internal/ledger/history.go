@@ -9,12 +9,33 @@ import (
 	"github.com/HONG-LOU/entcoin/internal/core"
 )
 
+type TransactionHistoryFilter string
+
+const (
+	TransactionHistoryAll      TransactionHistoryFilter = "all"
+	TransactionHistoryReceived TransactionHistoryFilter = "received"
+	TransactionHistorySent     TransactionHistoryFilter = "sent"
+	TransactionHistoryMining   TransactionHistoryFilter = "mining"
+)
+
 func (l *Ledger) TransactionHistory(ctx context.Context, address string, limit int) ([]TransactionRecord, error) {
+	return l.FilteredTransactionHistory(ctx, address, limit, TransactionHistoryAll)
+}
+
+func (l *Ledger) FilteredTransactionHistory(
+	ctx context.Context,
+	address string,
+	limit int,
+	filter TransactionHistoryFilter,
+) ([]TransactionRecord, error) {
 	if err := core.ValidateAddress(address); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > 1_000 {
 		return nil, fmt.Errorf("transaction history limit must be between 1 and 1000")
+	}
+	if !filter.valid() {
+		return nil, fmt.Errorf("unknown transaction history filter %q", filter)
 	}
 	tx, err := l.database.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -25,21 +46,39 @@ func (l *Ledger) TransactionHistory(ctx context.Context, address string, limit i
 	if err != nil {
 		return nil, err
 	}
-	records, err := pendingHistory(ctx, tx, address, limit)
+	records, err := pendingHistory(ctx, tx, address, limit, filter)
 	if err != nil {
 		return nil, err
 	}
 	if len(records) == limit {
 		return records, nil
 	}
-	confirmed, err := confirmedHistory(ctx, tx, address, limit-len(records), tip.Height)
+	confirmed, err := confirmedHistory(ctx, tx, address, limit-len(records), tip.Height, filter)
 	if err != nil {
 		return nil, err
 	}
 	return append(records, confirmed...), nil
 }
 
-func pendingHistory(ctx context.Context, query sqlQueryer, address string, limit int) ([]TransactionRecord, error) {
+func (filter TransactionHistoryFilter) valid() bool {
+	switch filter {
+	case TransactionHistoryAll, TransactionHistoryReceived, TransactionHistorySent, TransactionHistoryMining:
+		return true
+	default:
+		return false
+	}
+}
+
+func pendingHistory(
+	ctx context.Context,
+	query sqlQueryer,
+	address string,
+	limit int,
+	filter TransactionHistoryFilter,
+) ([]TransactionRecord, error) {
+	if filter == TransactionHistoryMining {
+		return []TransactionRecord{}, nil
+	}
 	rows, err := query.QueryContext(ctx, `
 		SELECT m.tx_id, m.first_seen, m.data,
 		       COALESCE((
@@ -57,7 +96,7 @@ func pendingHistory(ctx context.Context, query sqlQueryer, address string, limit
 		             AND (confirmed.address COLLATE NOCASE = ? OR pending.address COLLATE NOCASE = ?)
 		       ), 0) AS sent
 		FROM mempool m
-		WHERE EXISTS (
+		WHERE (EXISTS (
 			SELECT 1 FROM mempool_outputs output
 			WHERE output.tx_id = m.tx_id AND output.address COLLATE NOCASE = ?
 		) OR EXISTS (
@@ -69,10 +108,34 @@ func pendingHistory(ctx context.Context, query sqlQueryer, address string, limit
 			  ON pending.tx_id = input.input_tx_id AND pending.output_index = input.input_index
 			WHERE input.tx_id = m.tx_id
 			  AND (confirmed.address COLLATE NOCASE = ? OR pending.address COLLATE NOCASE = ?)
+		))
+		AND (
+			? = 'all'
+			OR (? = 'sent' AND EXISTS (
+				SELECT 1
+				FROM mempool_inputs filter_input
+				LEFT JOIN utxos filter_confirmed
+				  ON filter_confirmed.tx_id = filter_input.input_tx_id AND filter_confirmed.output_index = filter_input.input_index
+				LEFT JOIN mempool_outputs filter_pending
+				  ON filter_pending.tx_id = filter_input.input_tx_id AND filter_pending.output_index = filter_input.input_index
+				WHERE filter_input.tx_id = m.tx_id
+				  AND (filter_confirmed.address COLLATE NOCASE = ? OR filter_pending.address COLLATE NOCASE = ?)
+			))
+			OR (? = 'received' AND NOT EXISTS (
+				SELECT 1
+				FROM mempool_inputs filter_input
+				LEFT JOIN utxos filter_confirmed
+				  ON filter_confirmed.tx_id = filter_input.input_tx_id AND filter_confirmed.output_index = filter_input.input_index
+				LEFT JOIN mempool_outputs filter_pending
+				  ON filter_pending.tx_id = filter_input.input_tx_id AND filter_pending.output_index = filter_input.input_index
+				WHERE filter_input.tx_id = m.tx_id
+				  AND (filter_confirmed.address COLLATE NOCASE = ? OR filter_pending.address COLLATE NOCASE = ?)
+			))
 		)
 		ORDER BY m.sequence DESC
 		LIMIT ?
-	`, address, address, address, address, address, address, limit)
+	`, address, address, address, address, address, address,
+		filter, filter, address, address, filter, address, address, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query pending transaction history: %w", err)
 	}
@@ -111,7 +174,14 @@ func pendingHistory(ctx context.Context, query sqlQueryer, address string, limit
 	return records, nil
 }
 
-func confirmedHistory(ctx context.Context, query sqlQueryer, address string, limit int, tipHeight uint64) ([]TransactionRecord, error) {
+func confirmedHistory(
+	ctx context.Context,
+	query sqlQueryer,
+	address string,
+	limit int,
+	tipHeight uint64,
+	filter TransactionHistoryFilter,
+) ([]TransactionRecord, error) {
 	rows, err := query.QueryContext(ctx, `
 		SELECT t.id, t.block_height, t.tx_index, t.coinbase, t.data, b.hash, b.timestamp,
 		       COALESCE((
@@ -128,9 +198,22 @@ func confirmedHistory(ctx context.Context, query sqlQueryer, address string, lim
 			SELECT 1 FROM transaction_addresses ta
 			WHERE ta.tx_id = t.id AND ta.address COLLATE NOCASE = ?
 		)
+		AND (
+			? = 'all'
+			OR (? = 'mining' AND t.coinbase = 1)
+			OR (? = 'sent' AND t.coinbase = 0 AND EXISTS (
+				SELECT 1 FROM transaction_addresses filter_sent
+				WHERE filter_sent.tx_id = t.id AND filter_sent.address COLLATE NOCASE = ? AND filter_sent.direction = ?
+			))
+			OR (? = 'received' AND t.coinbase = 0 AND NOT EXISTS (
+				SELECT 1 FROM transaction_addresses filter_sent
+				WHERE filter_sent.tx_id = t.id AND filter_sent.address COLLATE NOCASE = ? AND filter_sent.direction = ?
+			))
+		)
 		ORDER BY t.block_height DESC, t.tx_index DESC
 		LIMIT ?
-	`, address, addressDirectionOutput, address, addressDirectionInput, address, limit)
+	`, address, addressDirectionOutput, address, addressDirectionInput, address,
+		filter, filter, filter, address, addressDirectionInput, filter, address, addressDirectionInput, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query confirmed transaction history: %w", err)
 	}

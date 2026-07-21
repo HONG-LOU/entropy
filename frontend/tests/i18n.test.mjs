@@ -25,6 +25,8 @@ test("dynamic version and block messages preserve their values", () => {
   assert.equal(translate("Entcoin v1.0.9 is available"), "Entcoin v1.0.9 可以更新");
   assert.equal(translate("Block 68012 mined"), "区块 #68012 已挖出");
   assert.equal(translate("6 confirmations"), "6 次确认");
+  assert.equal(translate("Downloading 67%"), "正在下载 67%");
+  assert.equal(translate("Downloaded 10.2 MB / 15.2 MB"), "已下载 10.2 MB / 15.2 MB");
 });
 
 test("unmapped backend failures remain natural in Chinese", () => {

@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-const testReleaseVersion = "1.0.10"
+const testReleaseVersion = "1.0.11"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -39,9 +39,10 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.11-rc1"},
+		{Title: "v1.0.12-rc1"},
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
+		{Title: "v1.0.11"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -74,8 +75,11 @@ func TestPrepareLatestVerifiesAndCachesArtifact(t *testing.T) {
 	artifact := []byte("verified deb payload")
 	client, server := testClient(t, artifact, false)
 	defer server.Close()
+	var progress []Progress
 
-	prepared, err := client.PrepareLatest(context.Background())
+	prepared, err := client.PrepareLatest(context.Background(), func(update Progress) {
+		progress = append(progress, update)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,13 +93,38 @@ func TestPrepareLatestVerifiesAndCachesArtifact(t *testing.T) {
 	if filepath.Dir(prepared.Path) != client.cacheRoot {
 		t.Fatalf("update escaped cache root: %s", prepared.Path)
 	}
+	if len(progress) < 4 || progress[0].Phase != "preparing" || progress[len(progress)-1].Phase != "verifying" {
+		t.Fatalf("progress events = %#v", progress)
+	}
+	download := progress[len(progress)-2]
+	if download.Phase != "downloading" || download.Downloaded != int64(len(artifact)) || download.Total != int64(len(artifact)) || download.Percent != 100 {
+		t.Fatalf("final download progress = %#v", download)
+	}
+}
+
+func TestProgressPercent(t *testing.T) {
+	tests := []struct {
+		downloaded int64
+		total      int64
+		want       int
+	}{
+		{downloaded: 0, total: 100, want: 0},
+		{downloaded: 67, total: 100, want: 67},
+		{downloaded: 200, total: 100, want: 100},
+		{downloaded: 10, total: -1, want: 0},
+	}
+	for _, test := range tests {
+		if got := progressPercent(test.downloaded, test.total); got != test.want {
+			t.Fatalf("progressPercent(%d, %d) = %d, want %d", test.downloaded, test.total, got, test.want)
+		}
+	}
 }
 
 func TestPrepareLatestRejectsChecksumMismatch(t *testing.T) {
 	client, server := testClient(t, []byte("tampered payload"), true)
 	defer server.Close()
 
-	_, err := client.PrepareLatest(context.Background())
+	_, err := client.PrepareLatest(context.Background(), nil)
 	if err == nil || !strings.Contains(err.Error(), "SHA-256") {
 		t.Fatalf("checksum mismatch error = %v", err)
 	}

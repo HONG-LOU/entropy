@@ -5,6 +5,15 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-07-21
+
+### Changed
+
+- Desktop transaction filters now query up to 100 matching wallet records from
+  SQLite instead of filtering only the latest 100 mixed transaction records.
+- The update button now shows real byte-based download progress with a filled
+  progress state, followed by explicit verification and installation phases.
+
 ## [1.0.9] - 2026-07-21
 
 ### Added

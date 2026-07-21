@@ -106,6 +106,21 @@ func TestLedgerLifecycleReorgAndImport(t *testing.T) {
 	if bobSecond.Received != wantBobChange || bobSecond.Sent != firstAmount {
 		t.Fatalf("Bob change transaction received/sent = %d/%d, want %d/%d", bobSecond.Received, bobSecond.Sent, wantBobChange, firstAmount)
 	}
+	bobReceived, err := ledger.FilteredTransactionHistory(ctx, bob.Address, 1, TransactionHistoryReceived)
+	if err != nil || len(bobReceived) != 1 || bobReceived[0].ID != first.ID {
+		t.Fatalf("filtered received history = %#v, err %v; want older transaction %s", bobReceived, err, first.ID)
+	}
+	bobSent, err := ledger.FilteredTransactionHistory(ctx, bob.Address, 1, TransactionHistorySent)
+	if err != nil || len(bobSent) != 1 || bobSent[0].ID != second.ID {
+		t.Fatalf("filtered sent history = %#v, err %v; want transaction %s", bobSent, err, second.ID)
+	}
+	aliceMining, err := ledger.FilteredTransactionHistory(ctx, alice.Address, 1, TransactionHistoryMining)
+	if err != nil || len(aliceMining) != 1 || aliceMining[0].ID != block2.Transactions[0].ID {
+		t.Fatalf("filtered mining history = %#v, err %v", aliceMining, err)
+	}
+	if _, err := ledger.FilteredTransactionHistory(ctx, bob.Address, 1, "unknown"); err == nil {
+		t.Fatal("unknown transaction history filter was accepted")
+	}
 	if _, err := ledger.database.ExecContext(ctx, "UPDATE blocks SET data = NULL WHERE height = 2"); err != nil {
 		t.Fatalf("simulate pruning block 2: %v", err)
 	}
@@ -145,6 +160,14 @@ func TestLedgerLifecycleReorgAndImport(t *testing.T) {
 	bobSecond = historyRecordByID(t, bobHistory, second.ID)
 	if bobSecond.Received != wantBobChange || bobSecond.Sent != firstAmount || !bobSecond.Pending {
 		t.Fatalf("pending Bob change received/sent = %d/%d, pending=%v", bobSecond.Received, bobSecond.Sent, bobSecond.Pending)
+	}
+	bobReceived, err = ledger.FilteredTransactionHistory(ctx, bob.Address, 1, TransactionHistoryReceived)
+	if err != nil || len(bobReceived) != 1 || bobReceived[0].ID != first.ID || !bobReceived[0].Pending {
+		t.Fatalf("filtered pending received history = %#v, err %v", bobReceived, err)
+	}
+	bobSent, err = ledger.FilteredTransactionHistory(ctx, bob.Address, 1, TransactionHistorySent)
+	if err != nil || len(bobSent) != 1 || bobSent[0].ID != second.ID || !bobSent[0].Pending {
+		t.Fatalf("filtered pending sent history = %#v, err %v", bobSent, err)
 	}
 	if err := ledger.ConnectBlock(ctx, block2); err != nil {
 		t.Fatalf("reconnect block 2: %v", err)
