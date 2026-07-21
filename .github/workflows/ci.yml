@@ -101,6 +101,9 @@ jobs:
           npm ci
           npm test
 
+      - name: Test website and release mirror contracts
+        run: node --test website/tests/site-core.test.mjs
+
       - name: Read package version
         run: |
           version=$(node -p "require('./frontend/package.json').version")

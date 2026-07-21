@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,9 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
-const testReleaseVersion = "1.0.11"
+const testReleaseVersion = "1.0.12"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -43,6 +45,7 @@ func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
 		{Title: "v1.0.11"},
+		{Title: "v1.0.12"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -56,7 +59,7 @@ func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.
 
 func TestCheckSelectsLinuxUpdate(t *testing.T) {
 	artifact := []byte("verified deb payload")
-	client, server := testClient(t, artifact, false)
+	client, server, _ := testClient(t, artifact, false)
 	defer server.Close()
 
 	status, err := client.Check(context.Background())
@@ -73,7 +76,7 @@ func TestCheckSelectsLinuxUpdate(t *testing.T) {
 
 func TestPrepareLatestVerifiesAndCachesArtifact(t *testing.T) {
 	artifact := []byte("verified deb payload")
-	client, server := testClient(t, artifact, false)
+	client, server, _ := testClient(t, artifact, false)
 	defer server.Close()
 	var progress []Progress
 
@@ -121,7 +124,7 @@ func TestProgressPercent(t *testing.T) {
 }
 
 func TestPrepareLatestRejectsChecksumMismatch(t *testing.T) {
-	client, server := testClient(t, []byte("tampered payload"), true)
+	client, server, _ := testClient(t, []byte("tampered payload"), true)
 	defer server.Close()
 
 	_, err := client.PrepareLatest(context.Background(), nil)
@@ -149,10 +152,23 @@ func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.
 	if err := validateUpdateURL("https://entcoin.xyz/other.json"); err == nil {
 		t.Fatal("unexpected Entcoin website URL was accepted")
 	}
+	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.11/entcoin_1.0.11_amd64.deb"); err != nil {
+		t.Fatal(err)
+	}
+	for _, address := range []string{
+		"http://entcoin.xyz/downloads/v1.0.11/entcoin.exe",
+		"https://www.entcoin.xyz/downloads/v1.0.11/entcoin.exe",
+		"https://entcoin.xyz/downloads/../update.json",
+		"https://entcoin.xyz/downloads/v1.0.11/entcoin.exe?source=other",
+	} {
+		if err := validateUpdateURL(address); err == nil {
+			t.Fatalf("unexpected mirror URL was accepted: %s", address)
+		}
+	}
 }
 
 func TestCheckFallsBackToWebsiteManifest(t *testing.T) {
-	client, server := testClient(t, []byte("verified deb payload"), false)
+	client, server, _ := testClient(t, []byte("verified deb payload"), false)
 	defer server.Close()
 	client.feedURL = server.URL + "/invalid-feed"
 	client.manifestURL = server.URL + "/manifest"
@@ -163,6 +179,96 @@ func TestCheckFallsBackToWebsiteManifest(t *testing.T) {
 	}
 	if !status.Available || status.LatestVersion != testReleaseVersion {
 		t.Fatalf("unexpected manifest status: %#v", status)
+	}
+}
+
+func TestPrepareLatestFallsBackFromMirrorToGitHub(t *testing.T) {
+	artifact := []byte("verified deb payload")
+	client, server, state := testClient(t, artifact, false)
+	defer server.Close()
+	client.mirrorBases = []string{server.URL + "/missing/"}
+
+	prepared, err := client.PrepareLatest(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(prepared.Path); err != nil {
+		t.Fatal(err)
+	}
+	if len(state.paths) < 2 || !strings.HasPrefix(state.paths[0], "/missing/") || !strings.HasPrefix(state.paths[1], "/download/") {
+		t.Fatalf("download source order = %v", state.paths)
+	}
+}
+
+func TestPrepareLatestResumesPartialArtifact(t *testing.T) {
+	artifact := []byte("verified deb payload with enough bytes to resume")
+	client, server, state := testClient(t, artifact, false)
+	defer server.Close()
+	artifactName := "entcoin_" + testReleaseVersion + "_amd64.deb"
+	partialPath := filepath.Join(client.cacheRoot, artifactName+".part")
+	if err := os.WriteFile(partialPath, artifact[:12], 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prepared, err := client.PrepareLatest(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(prepared.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, artifact) {
+		t.Fatalf("resumed artifact = %q", data)
+	}
+	if len(state.ranges) != 1 || state.ranges[0] != "bytes=12-" {
+		t.Fatalf("artifact ranges = %v", state.ranges)
+	}
+}
+
+func TestPrepareLatestRestartsWhenServerIgnoresRange(t *testing.T) {
+	artifact := []byte("verified deb payload")
+	client, server, _ := testClient(t, artifact, false)
+	defer server.Close()
+	client.downloadBase = server.URL + "/no-range/"
+	artifactName := "entcoin_" + testReleaseVersion + "_amd64.deb"
+	partialPath := filepath.Join(client.cacheRoot, artifactName+".part")
+	if err := os.WriteFile(partialPath, []byte("old partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prepared, err := client.PrepareLatest(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(prepared.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, artifact) {
+		t.Fatalf("restarted artifact = %q", data)
+	}
+}
+
+func TestPrepareLatestRejectsBadMirrorAndDownloadsCleanFallback(t *testing.T) {
+	artifact := []byte("verified deb payload")
+	client, server, state := testClient(t, artifact, false)
+	defer server.Close()
+	client.mirrorBases = []string{server.URL + "/bad-mirror/"}
+
+	prepared, err := client.PrepareLatest(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(prepared.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, artifact) {
+		t.Fatalf("fallback artifact = %q", data)
+	}
+	if len(state.paths) < 2 || !strings.HasPrefix(state.paths[0], "/bad-mirror/") || !strings.HasPrefix(state.paths[1], "/download/") {
+		t.Fatalf("download source order = %v", state.paths)
 	}
 }
 
@@ -188,7 +294,12 @@ func TestReadRetriesTemporaryFailures(t *testing.T) {
 	}
 }
 
-func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptest.Server) {
+type testServerState struct {
+	paths  []string
+	ranges []string
+}
+
+func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptest.Server, *testServerState) {
 	t.Helper()
 	artifactName := "entcoin_" + testReleaseVersion + "_amd64.deb"
 	checksum := sha256.Sum256(artifact)
@@ -196,8 +307,13 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 	if mismatch {
 		checksumText = strings.Repeat("0", sha256.Size*2)
 	}
+	state := &testServerState{}
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if strings.Contains(request.URL.Path, artifactName) {
+			state.paths = append(state.paths, request.URL.Path)
+			state.ranges = append(state.ranges, request.Header.Get("Range"))
+		}
 		switch request.URL.Path {
 		case "/feed":
 			response.Header().Set("Content-Type", "application/atom+xml")
@@ -217,8 +333,14 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 		case "/invalid-feed":
 			_, _ = response.Write([]byte("not atom"))
 		case "/download/v" + testReleaseVersion + "/" + artifactName:
+			http.ServeContent(response, request, artifactName, time.Time{}, bytes.NewReader(artifact))
+		case "/no-range/v" + testReleaseVersion + "/" + artifactName:
 			_, _ = response.Write(artifact)
+		case "/bad-mirror/v" + testReleaseVersion + "/" + artifactName:
+			_, _ = response.Write(bytes.Repeat([]byte("x"), len(artifact)))
 		case "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
+			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
+		case "/no-range/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		default:
 			http.NotFound(response, request)
@@ -233,5 +355,5 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 		cacheRoot:    t.TempDir(),
 		validateURL:  func(string) error { return nil },
 	}
-	return client, server
+	return client, server, state
 }

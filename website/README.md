@@ -27,7 +27,9 @@ powershell -ExecutionPolicy Bypass -File website/tools/generate-social-preview.p
 
 - Protocol and implementation claims are derived from the repository docs.
 - The same-origin status endpoint accepts only `entropy-mainnet-v1` responses.
-- Release links are pinned to the verified v1.0.10 assets in the official GitHub repository.
+- Release links use versioned files under `https://entcoin.xyz/downloads/`.
+  Every mirror file must byte-match the corresponding official GitHub Release
+  SHA-256 manifest.
 - The open-network section describes the two-region public seed topology and local validation boundary.
 
 ## Production layout
@@ -37,6 +39,12 @@ Each deployment is uploaded to `/var/www/entcoin/releases/<git-sha>`. The
 `entcoin.xyz` serves that directory, `www.entcoin.xyz` redirects to the apex,
 and only `GET /api/network-status` proxies to the local public archive node at
 `http://127.0.0.1:47821/v2/status`.
+
+Release mirror files live separately under
+`/var/www/entcoin/downloads/v<version>/`. Nginx exposes this directory at
+`/downloads/` with immutable caching and byte-range support. Upload artifacts
+only after checking both GitHub Release checksum manifests locally; never
+replace files inside a published version directory.
 
 The website host is `/etc/nginx/sites-available/entcoin-website`. It is separate
 from `/etc/nginx/sites-available/entcoin-node`, which must remain enabled and

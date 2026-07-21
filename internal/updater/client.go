@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -20,14 +21,15 @@ import (
 )
 
 const (
-	CurrentVersion    = "1.0.10"
-	ReleasesURL       = "https://github.com/HONG-LOU/entcoin/releases/latest"
-	releaseFeedURL    = "https://github.com/HONG-LOU/entcoin/releases.atom"
-	updateManifestURL = "https://entcoin.xyz/update.json"
-	maxMetadataBytes  = 1 << 20
-	maxChecksumBytes  = 128 << 10
-	maxArtifactBytes  = 300 << 20
-	metadataTimeout   = 10 * time.Second
+	CurrentVersion     = "1.0.11"
+	ReleasesURL        = "https://github.com/HONG-LOU/entcoin/releases/latest"
+	releaseFeedURL     = "https://github.com/HONG-LOU/entcoin/releases.atom"
+	updateManifestURL  = "https://entcoin.xyz/update.json"
+	mirrorDownloadBase = "https://entcoin.xyz/downloads/"
+	maxMetadataBytes   = 1 << 20
+	maxChecksumBytes   = 128 << 10
+	maxArtifactBytes   = 300 << 20
+	metadataTimeout    = 10 * time.Second
 )
 
 type Status struct {
@@ -57,6 +59,7 @@ type Client struct {
 	feedURL      string
 	manifestURL  string
 	downloadBase string
+	mirrorBases  []string
 	httpClient   *http.Client
 	platform     string
 	architecture string
@@ -88,7 +91,7 @@ type updateManifest struct {
 
 type releaseAsset struct {
 	Name string
-	URL  string
+	URLs []string
 }
 
 type releaseSelection struct {
@@ -102,6 +105,7 @@ func New() *Client {
 		feedURL:      releaseFeedURL,
 		manifestURL:  updateManifestURL,
 		downloadBase: "https://github.com/HONG-LOU/entcoin/releases/download/",
+		mirrorBases:  []string{mirrorDownloadBase},
 		httpClient:   secureHTTPClient(),
 		platform:     runtime.GOOS,
 		architecture: runtime.GOARCH,
@@ -126,7 +130,7 @@ func (c *Client) PrepareLatest(ctx context.Context, report ProgressReporter) (Pr
 	if !selection.status.Available {
 		return PreparedUpdate{}, errors.New("Entcoin is already up to date")
 	}
-	checksumData, err := c.read(ctx, selection.checksum.URL, maxChecksumBytes)
+	checksumData, err := c.read(ctx, selection.checksum.URLs[0], maxChecksumBytes)
 	if err != nil {
 		return PreparedUpdate{}, fmt.Errorf("download release checksums: %w", err)
 	}
@@ -219,9 +223,14 @@ func (c *Client) selectRelease(latestVersion, releaseURL, publishedAt string) (r
 	if err != nil {
 		return releaseSelection{}, err
 	}
-	assetBase := c.downloadBase + "v" + latestVersion + "/"
-	artifact := releaseAsset{Name: artifactName, URL: assetBase + artifactName}
-	checksum := releaseAsset{Name: checksumName, URL: assetBase + checksumName}
+	githubBase := c.downloadBase + "v" + latestVersion + "/"
+	artifactURLs := make([]string, 0, len(c.mirrorBases)+1)
+	for _, base := range c.mirrorBases {
+		artifactURLs = append(artifactURLs, base+"v"+latestVersion+"/"+artifactName)
+	}
+	artifactURLs = append(artifactURLs, githubBase+artifactName)
+	artifact := releaseAsset{Name: artifactName, URLs: artifactURLs}
+	checksum := releaseAsset{Name: checksumName, URLs: []string{githubBase + checksumName}}
 	status.AssetName = artifactName
 	return releaseSelection{status: status, artifact: artifact, checksum: checksum}, nil
 }
@@ -312,67 +321,180 @@ func (c *Client) downloadArtifact(
 		reportProgress(report, "verifying", 1, 1)
 		return destination, nil
 	}
-
-	if err := c.validateURL(asset.URL); err != nil {
+	partialPath := destination + ".part"
+	if valid, err := fileMatches(partialPath, expected); err != nil {
 		return "", err
+	} else if valid {
+		info, err := os.Stat(partialPath)
+		if err != nil {
+			return "", fmt.Errorf("inspect verified update: %w", err)
+		}
+		reportProgress(report, "verifying", info.Size(), info.Size())
+		return promoteDownloadedArtifact(partialPath, destination)
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.URL, nil)
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("Accept", "application/octet-stream")
-	request.Header.Set("User-Agent", "Entcoin/"+CurrentVersion)
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("download update: %w", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download update: unexpected HTTP status %s", response.Status)
-	}
-	if response.ContentLength > maxArtifactBytes {
-		return "", errors.New("download update: response exceeds the maximum artifact size")
-	}
-	reportProgress(report, "downloading", 0, response.ContentLength)
 
-	temporary, err := os.CreateTemp(cacheRoot, ".entcoin-update-*")
+	var downloadErrors []error
+	for _, address := range asset.URLs {
+		if err := c.downloadSource(ctx, address, partialPath, report); err != nil {
+			downloadErrors = append(downloadErrors, fmt.Errorf("%s: %w", downloadHost(address), err))
+			continue
+		}
+		valid, err := fileMatches(partialPath, expected)
+		if err != nil {
+			return "", err
+		}
+		if !valid {
+			downloadErrors = append(downloadErrors, fmt.Errorf("%s: downloaded update failed SHA-256 verification", downloadHost(address)))
+			if err := os.Truncate(partialPath, 0); err != nil {
+				return "", fmt.Errorf("reset invalid partial update: %w", err)
+			}
+			continue
+		}
+		return promoteDownloadedArtifact(partialPath, destination)
+	}
+	return "", fmt.Errorf("download update: %w", errors.Join(downloadErrors...))
+}
+
+func (c *Client) downloadSource(ctx context.Context, address, partialPath string, report ProgressReporter) error {
+	if err := c.validateURL(address); err != nil {
+		return err
+	}
+	partial, err := os.OpenFile(partialPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return "", fmt.Errorf("create update file: %w", err)
+		return fmt.Errorf("open partial update: %w", err)
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	hash := sha256.New()
-	progress := &progressWriter{
-		writer: io.MultiWriter(temporary, hash),
-		total:  response.ContentLength,
-		report: report,
+	defer partial.Close()
+
+	for attempt := 0; attempt < 2; attempt++ {
+		info, err := partial.Stat()
+		if err != nil {
+			return fmt.Errorf("inspect partial update: %w", err)
+		}
+		offset := info.Size()
+		if offset > maxArtifactBytes {
+			if err := partial.Truncate(0); err != nil {
+				return fmt.Errorf("reset oversized partial update: %w", err)
+			}
+			offset = 0
+		}
+
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+		if err != nil {
+			return err
+		}
+		request.Header.Set("Accept", "application/octet-stream")
+		request.Header.Set("User-Agent", "Entcoin/"+CurrentVersion)
+		if offset > 0 {
+			request.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+		}
+		response, err := c.httpClient.Do(request)
+		if err != nil {
+			return fmt.Errorf("request update: %w", err)
+		}
+
+		if response.StatusCode == http.StatusRequestedRangeNotSatisfiable && offset > 0 {
+			response.Body.Close()
+			if err := partial.Truncate(0); err != nil {
+				return fmt.Errorf("reset rejected partial update: %w", err)
+			}
+			continue
+		}
+
+		total, appendResponse, err := downloadResponseRange(response, offset)
+		if err != nil {
+			response.Body.Close()
+			return err
+		}
+		if total > maxArtifactBytes {
+			response.Body.Close()
+			return errors.New("response exceeds the maximum artifact size")
+		}
+		if !appendResponse {
+			offset = 0
+			if err := partial.Truncate(0); err != nil {
+				response.Body.Close()
+				return fmt.Errorf("restart partial update: %w", err)
+			}
+		}
+		if _, err := partial.Seek(offset, io.SeekStart); err != nil {
+			response.Body.Close()
+			return fmt.Errorf("seek partial update: %w", err)
+		}
+		reportProgress(report, "downloading", offset, total)
+		progress := &progressWriter{writer: partial, total: total, downloaded: offset, report: report}
+		written, copyErr := io.Copy(progress, io.LimitReader(response.Body, maxArtifactBytes-offset+1))
+		closeErr := response.Body.Close()
+		if copyErr != nil {
+			return fmt.Errorf("write partial update: %w", copyErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close update response: %w", closeErr)
+		}
+		if offset+written > maxArtifactBytes || (response.ContentLength >= 0 && written != response.ContentLength) {
+			return errors.New("downloaded update size does not match the HTTP response")
+		}
+		if total >= 0 && offset+written != total {
+			return errors.New("partial update did not reach the advertised size")
+		}
+		if err := partial.Sync(); err != nil {
+			return fmt.Errorf("flush partial update: %w", err)
+		}
+		reportProgress(report, "verifying", offset+written, total)
+		return nil
 	}
-	written, copyErr := io.Copy(progress, io.LimitReader(response.Body, maxArtifactBytes+1))
-	closeErr := temporary.Close()
-	if copyErr != nil {
-		return "", fmt.Errorf("write update file: %w", copyErr)
+	return errors.New("server rejected the partial update")
+}
+
+var contentRangePattern = regexp.MustCompile(`^bytes ([0-9]+)-([0-9]+)/([0-9]+)$`)
+
+func downloadResponseRange(response *http.Response, offset int64) (int64, bool, error) {
+	if response.StatusCode == http.StatusOK {
+		return response.ContentLength, false, nil
 	}
-	if closeErr != nil {
-		return "", fmt.Errorf("close update file: %w", closeErr)
+	if response.StatusCode != http.StatusPartialContent || offset == 0 {
+		return 0, false, fmt.Errorf("unexpected HTTP status %s", response.Status)
 	}
-	if written > maxArtifactBytes || (response.ContentLength >= 0 && written != response.ContentLength) {
-		return "", errors.New("downloaded update size does not match the HTTP response")
+	matches := contentRangePattern.FindStringSubmatch(response.Header.Get("Content-Range"))
+	if matches == nil {
+		return 0, false, errors.New("invalid Content-Range response")
 	}
-	reportProgress(report, "verifying", written, response.ContentLength)
-	actual := hex.EncodeToString(hash.Sum(nil))
-	if actual != expected {
-		return "", errors.New("downloaded update failed SHA-256 verification")
+	start, err := strconv.ParseInt(matches[1], 10, 64)
+	if err != nil {
+		return 0, false, errors.New("invalid Content-Range start")
 	}
-	if err := os.Chmod(temporaryPath, 0o700); err != nil {
+	end, err := strconv.ParseInt(matches[2], 10, 64)
+	if err != nil {
+		return 0, false, errors.New("invalid Content-Range end")
+	}
+	total, err := strconv.ParseInt(matches[3], 10, 64)
+	if err != nil {
+		return 0, false, errors.New("invalid Content-Range total")
+	}
+	if start != offset || end < start || end >= total || (response.ContentLength >= 0 && response.ContentLength != end-start+1) {
+		return 0, false, errors.New("inconsistent Content-Range response")
+	}
+	return total, true, nil
+}
+
+func promoteDownloadedArtifact(partialPath, destination string) (string, error) {
+	if err := os.Chmod(partialPath, 0o700); err != nil {
 		return "", fmt.Errorf("secure update file: %w", err)
 	}
 	if err := os.Remove(destination); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("replace cached update: %w", err)
 	}
-	if err := os.Rename(temporaryPath, destination); err != nil {
+	if err := os.Rename(partialPath, destination); err != nil {
 		return "", fmt.Errorf("store verified update: %w", err)
 	}
 	return destination, nil
+}
+
+func downloadHost(address string) string {
+	parsed, err := url.Parse(address)
+	if err != nil || parsed.Hostname() == "" {
+		return "update source"
+	}
+	return parsed.Hostname()
 }
 
 type progressWriter struct {
@@ -429,7 +551,24 @@ func validateUpdateURL(raw string) error {
 	if raw == updateManifestURL {
 		return nil
 	}
+	if err := validateMirrorURL(raw); err == nil {
+		return nil
+	}
 	return validateGitHubURL(raw)
+}
+
+var mirrorPathPattern = regexp.MustCompile(`^/downloads/v[0-9]+\.[0-9]+\.[0-9]+/[A-Za-z0-9._-]+$`)
+
+func validateMirrorURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if parsed.Scheme != "https" || parsed.User != nil || parsed.Host != "entcoin.xyz" ||
+		parsed.RawQuery != "" || parsed.Fragment != "" || !mirrorPathPattern.MatchString(parsed.EscapedPath()) {
+		return errors.New("update URL is not an official Entcoin mirror URL")
+	}
+	return nil
 }
 
 func validateGitHubURL(raw string) error {

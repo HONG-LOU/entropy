@@ -1,4 +1,4 @@
-export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.10";
+export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.11";
 
 const en = {
   "meta.title": "Entcoin — Your wallet, your node.",
@@ -105,7 +105,7 @@ const en = {
   "download.cli.action": "CLI downloads",
   "download.checksums": "Checksums",
   "download.release": "View release notes",
-  "download.boundary": "v1.0.10 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
+  "download.boundary": "v1.0.11 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
   "infrastructure.eyebrow": "06 / Live infrastructure",
   "infrastructure.title": "Inspect the public node.",
   "infrastructure.body": "This page reads the same bounded status endpoint other nodes use. No market ticker and no fabricated activity.",
@@ -247,7 +247,7 @@ const zh = {
   "download.cli.action": "选择命令行版本",
   "download.checksums": "核对文件完整性",
   "download.release": "查看版本说明",
-  "download.boundary": "v1.0.10 暂未购买代码签名证书，Windows 可能显示“未知发布者”或 SmartScreen 提醒。请只从本官网或官方 GitHub 下载，并核对 SHA-256。",
+  "download.boundary": "v1.0.11 暂未购买代码签名证书，Windows 可能显示“未知发布者”或 SmartScreen 提醒。请只从本官网或官方 GitHub 下载，并核对 SHA-256。",
   "infrastructure.eyebrow": "06 / 网络现状",
   "infrastructure.title": "公共节点现在是否在线？",
   "infrastructure.body": "这里直接读取公共节点的实时状态，显示它当前同步到的区块高度和最新区块摘要。公共节点用于帮助其他节点联网和同步，不托管用户钱包。",
@@ -326,7 +326,7 @@ export function selectReleaseAssets(value) {
   if (!isStableRelease(value)) return fallback;
 
   const prefix = `/HONG-LOU/entcoin/releases/download/${value.tag_name}/`;
-  const known = new Map();
+  const known = new Set();
   for (const asset of Array.isArray(value.assets) ? value.assets : []) {
     if (!asset || typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") continue;
     let url;
@@ -336,19 +336,19 @@ export function selectReleaseAssets(value) {
       continue;
     }
     if (url.protocol !== "https:" || url.hostname !== "github.com" || !url.pathname.startsWith(prefix)) continue;
-    known.set(asset.name, url.href);
+    known.add(asset.name);
   }
 
   return {
     version: value.tag_name,
     release: value.html_url,
-    windowsPortable: findAsset(known, /^Entcoin\.exe$/i) ?? fallback.release,
-    windowsInstaller: findAsset(known, /^entcoin-amd64-installer\.exe$/i) ?? fallback.release,
-    ubuntu: findAsset(known, /^entcoin_\d+\.\d+\.\d+_amd64\.deb$/i) ?? fallback.release,
-    linuxCli: findAsset(known, /^entcoin-cli-linux-amd64$/i) ?? fallback.release,
-    windowsCli: findAsset(known, /^entcoin-cli\.exe$/i) ?? fallback.release,
-    linuxChecksums: findAsset(known, /^SHA256SUMS-linux\.txt$/i) ?? fallback.release,
-    windowsChecksums: findAsset(known, /^SHA256SUMS\.txt$/i) ?? fallback.release,
+    windowsPortable: findMirrorAsset(known, /^Entcoin\.exe$/i, value.tag_name) ?? fallback.release,
+    windowsInstaller: findMirrorAsset(known, /^entcoin-amd64-installer\.exe$/i, value.tag_name) ?? fallback.release,
+    ubuntu: findMirrorAsset(known, /^entcoin_\d+\.\d+\.\d+_amd64\.deb$/i, value.tag_name) ?? fallback.release,
+    linuxCli: findMirrorAsset(known, /^entcoin-cli-linux-amd64$/i, value.tag_name) ?? fallback.release,
+    windowsCli: findMirrorAsset(known, /^entcoin-cli\.exe$/i, value.tag_name) ?? fallback.release,
+    linuxChecksums: findMirrorAsset(known, /^SHA256SUMS-linux\.txt$/i, value.tag_name) ?? fallback.release,
+    windowsChecksums: findMirrorAsset(known, /^SHA256SUMS\.txt$/i, value.tag_name) ?? fallback.release,
   };
 }
 
@@ -365,16 +365,16 @@ function isStableRelease(value) {
   }
 }
 
-function findAsset(assets, pattern) {
-  for (const [name, url] of assets) {
-    if (pattern.test(name)) return url;
+function findMirrorAsset(assets, pattern, version) {
+  for (const name of assets) {
+    if (pattern.test(name)) return `https://entcoin.xyz/downloads/${version}/${encodeURIComponent(name)}`;
   }
   return undefined;
 }
 
 function fallbackRelease() {
   return {
-    version: "v1.0.10",
+    version: "v1.0.11",
     release: FALLBACK_RELEASE_URL,
     windowsPortable: FALLBACK_RELEASE_URL,
     windowsInstaller: FALLBACK_RELEASE_URL,

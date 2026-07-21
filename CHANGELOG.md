@@ -5,6 +5,18 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-07-21
+
+### Changed
+
+- Desktop updates now prefer the official `entcoin.xyz` release mirror and
+  automatically fall back to GitHub while keeping the expected SHA-256 digest
+  anchored to the matching GitHub Release checksum manifest.
+- Interrupted installer downloads remain in the protected update cache and
+  resume with bounded HTTP Range requests. Servers that reject or ignore a
+  range request safely restart the artifact from byte zero.
+- Website download actions now use the same versioned release mirror.
+
 ## [1.0.10] - 2026-07-21
 
 ### Changed

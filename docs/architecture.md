@@ -1,8 +1,8 @@
-# Entcoin v1.0.10 architecture
+# Entcoin v1.0.11 architecture
 
 ## Scope
 
-Entcoin v1.0.10 implements the `entropy-mainnet-v1` network. It is designed so
+Entcoin v1.0.11 implements the `entropy-mainnet-v1` network. It is designed so
 one Windows or Ubuntu application can be a wallet, a full validator, a relaying
 peer, and an optional proof-of-work miner without an external database service.
 
