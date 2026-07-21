@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const testReleaseVersion = "1.0.12"
+const testReleaseVersion = "1.0.13"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -41,11 +41,11 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.12-rc1"},
+		{Title: "v1.0.13-rc1"},
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
-		{Title: "v1.0.11"},
 		{Title: "v1.0.12"},
+		{Title: "v1.0.13"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -152,14 +152,14 @@ func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.
 	if err := validateUpdateURL("https://entcoin.xyz/other.json"); err == nil {
 		t.Fatal("unexpected Entcoin website URL was accepted")
 	}
-	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.11/entcoin_1.0.11_amd64.deb"); err != nil {
+	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.12/entcoin_1.0.12_amd64.deb"); err != nil {
 		t.Fatal(err)
 	}
 	for _, address := range []string{
-		"http://entcoin.xyz/downloads/v1.0.11/entcoin.exe",
-		"https://www.entcoin.xyz/downloads/v1.0.11/entcoin.exe",
+		"http://entcoin.xyz/downloads/v1.0.12/entcoin.exe",
+		"https://www.entcoin.xyz/downloads/v1.0.12/entcoin.exe",
 		"https://entcoin.xyz/downloads/../update.json",
-		"https://entcoin.xyz/downloads/v1.0.11/entcoin.exe?source=other",
+		"https://entcoin.xyz/downloads/v1.0.12/entcoin.exe?source=other",
 	} {
 		if err := validateUpdateURL(address); err == nil {
 			t.Fatalf("unexpected mirror URL was accepted: %s", address)

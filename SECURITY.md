@@ -2,7 +2,7 @@
 
 ## Mainnet scope
 
-Entcoin v1.0.11 uses the compatibility identity `entropy-mainnet-v1`. The word
+Entcoin v1.0.12 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
 not mean the implementation has received an independent security audit.
 
@@ -115,14 +115,14 @@ guaranteed response-time program.
   feed or exact `entcoin.xyz/update.json` fallback. Installers may come from the
   exact versioned `entcoin.xyz/downloads/` mirror or trusted GitHub HTTPS hosts,
   but must match the checksum manifest fetched from the same GitHub Release.
-- v1.0.11 Windows binaries are not Authenticode-signed and may trigger
+- v1.0.12 Windows binaries are not Authenticode-signed and may trigger
   SmartScreen. Release CI signs and verifies every EXE when a CA-issued
   certificate is configured; builds are not yet reproducible.
 - P-256 addresses and mnemonic derivation are Entcoin-specific and not Bitcoin
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v1.0.11. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.12. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.

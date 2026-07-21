@@ -5,6 +5,14 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-07-21
+
+### Changed
+
+- Published a maintenance release so installed v1.0.11 clients can exercise the
+  official mirror, resumable download, checksum verification, installation,
+  and restart path end to end.
+
 ## [1.0.11] - 2026-07-21
 
 ### Changed
