@@ -39,6 +39,7 @@ import {
   createIcons,
 } from "lucide";
 import "./style.css";
+import { filterTransactions, transactionKind } from "./transaction-filter.js";
 
 const appIcons = {
   Activity,
@@ -83,6 +84,7 @@ const appIcons = {
 const state = {
   dashboard: null,
   history: [],
+  historyFilter: "all",
   ready: false,
   startupCode: "starting",
   startupChecking: false,
@@ -491,11 +493,11 @@ function renderDashboard(data) {
 }
 
 function transactionType(transaction) {
-  if (transaction.coinbase) return { label: "Mining reward", className: "mined", icon: "pickaxe" };
-  if (!/^0(?:\.0+)?$/.test(String(transaction.sent ?? "0"))) {
-    return { label: "Sent transaction", className: "sent", icon: "arrow-up-right" };
+  switch (transactionKind(transaction)) {
+    case "mining": return { label: "Mining reward", className: "mined", icon: "pickaxe" };
+    case "sent": return { label: "Sent transaction", className: "sent", icon: "arrow-up-right" };
+    default: return { label: "Received transaction", className: "received", icon: "arrow-down-left" };
   }
-  return { label: "Received transaction", className: "received", icon: "arrow-down-left" };
 }
 
 function amountCell(value, className) {
@@ -514,18 +516,26 @@ function amountCell(value, className) {
 function renderHistory(transactions) {
   const body = $("history-body");
   body.replaceChildren();
-  setText("history-count", transactions.length.toLocaleString());
+  const filtered = filterTransactions(transactions, state.historyFilter);
+  setText("history-count", filtered.length.toLocaleString());
+  setText("history-total", transactions.length.toLocaleString());
 
-  if (transactions.length === 0) {
+  if (filtered.length === 0) {
     const row = body.insertRow();
     const cell = row.insertCell();
     cell.colSpan = 5;
     cell.className = "empty-cell";
-    cell.textContent = "No wallet transactions yet";
+    const emptyMessages = {
+      all: "No wallet transactions yet",
+      received: "No received transactions in loaded history",
+      sent: "No sent transactions in loaded history",
+      mining: "No mining rewards in loaded history",
+    };
+    cell.textContent = emptyMessages[state.historyFilter] || emptyMessages.all;
     return;
   }
 
-  for (const transaction of transactions) {
+  for (const transaction of filtered) {
     const row = body.insertRow();
     row.className = "transaction-row";
     row.tabIndex = 0;
@@ -598,7 +608,7 @@ async function refreshDashboard() {
 function renderUpdate(status) {
   state.updateStatus = status;
   state.updateChecked = true;
-  setText("current-version", `v${status.current_version || "1.0.7"}`);
+  setText("current-version", `v${status.current_version || "1.0.8"}`);
   const available = Boolean(status.available);
   setText("update-status", available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date");
   $("install-update").hidden = !available;
@@ -611,7 +621,7 @@ async function checkForUpdates(manual = false) {
   state.updateChecking = true;
   const button = $("check-update");
   setButtonBusy(button, true, "Checking");
-  setText("update-status", "Checking GitHub releases");
+  setText("update-status", "Checking for updates");
   try {
     const status = await invoke("CheckForUpdate");
     renderUpdate(status);
@@ -634,8 +644,8 @@ async function installUpdate() {
   setText("update-status", "Downloading and verifying the update");
   try {
     const result = await invoke("InstallUpdate");
-    setText("update-status", result.message || "System installer opened");
-    showToast(result.message || "System installer opened");
+    setText("update-status", result.message || "Update ready; restarting");
+    showToast(result.message || "Update ready; restarting");
   } catch (error) {
     setText("update-status", "Update installation did not start");
     showToast(errorMessage(error), "error");
@@ -914,6 +924,17 @@ $("open-release-page").addEventListener("click", () => invoke("OpenReleasePage")
 $("check-update").addEventListener("click", () => checkForUpdates(true));
 $("install-update").addEventListener("click", installUpdate);
 $("open-update").addEventListener("click", () => activateView("diagnostics"));
+document.querySelectorAll("[data-history-filter]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.historyFilter = button.dataset.historyFilter;
+    document.querySelectorAll("[data-history-filter]").forEach((candidate) => {
+      const active = candidate === button;
+      candidate.classList.toggle("active", active);
+      candidate.setAttribute("aria-pressed", String(active));
+    });
+    renderHistory(state.history);
+  });
+});
 
 $("send-form").addEventListener("submit", async (event) => {
   event.preventDefault();

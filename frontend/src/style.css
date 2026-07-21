@@ -276,6 +276,10 @@ td code { color: var(--green); }
 
 .history-summary { justify-content: space-between; gap: 15px; padding-bottom: 12px; color: var(--muted); border-bottom: 1px solid var(--soft-line); font-size: 11px; }
 .history-summary b { color: var(--ink); }
+.history-filters { display: inline-flex; align-items: center; padding: 2px; background: #eef1ef; border: 1px solid var(--line); border-radius: 5px; }
+.history-filters button { min-width: 68px; height: 28px; padding: 0 9px; color: #59635e; background: transparent; border: 0; border-radius: 3px; font-size: 10px; font-weight: 700; }
+.history-filters button:hover { color: var(--ink); }
+.history-filters button.active { color: #fff; background: var(--green); }
 .history-table { min-width: 790px; }
 .history-table th:nth-child(1), .history-table td:nth-child(1) { width: 18%; }
 .history-table th:nth-child(2), .history-table td:nth-child(2) { width: 31%; }
@@ -482,7 +486,7 @@ dialog.modal[open] { display: grid; place-items: center; }
 }
 
 @media (max-width: 680px) {
-	.transaction-overview, .transaction-io-grid { grid-template-columns: 1fr; }
+  .transaction-overview, .transaction-io-grid { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
   .topbar-update span { display: none; }
   .topbar-update { width: 30px; justify-content: center; padding: 0; }
@@ -511,6 +515,9 @@ dialog.modal[open] { display: grid; place-items: center; }
   .recovery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .recovery-controls { grid-template-columns: 1fr; }
   .recovery-controls button { width: 100%; }
+  .history-summary { align-items: stretch; flex-wrap: wrap; }
+  .history-filters { order: 3; width: 100%; }
+  .history-filters button { min-width: 0; flex: 1; }
   dialog.modal { padding: 10px; }
   .modal-shell { max-height: calc(100vh - 20px); }
 }

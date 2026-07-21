@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -19,12 +20,14 @@ import (
 )
 
 const (
-	CurrentVersion   = "1.0.7"
-	ReleasesURL      = "https://github.com/HONG-LOU/entcoin/releases/latest"
-	releaseFeedURL   = "https://github.com/HONG-LOU/entcoin/releases.atom"
-	maxMetadataBytes = 1 << 20
-	maxChecksumBytes = 128 << 10
-	maxArtifactBytes = 300 << 20
+	CurrentVersion    = "1.0.8"
+	ReleasesURL       = "https://github.com/HONG-LOU/entcoin/releases/latest"
+	releaseFeedURL    = "https://github.com/HONG-LOU/entcoin/releases.atom"
+	updateManifestURL = "https://entcoin.xyz/update.json"
+	maxMetadataBytes  = 1 << 20
+	maxChecksumBytes  = 128 << 10
+	maxArtifactBytes  = 300 << 20
+	metadataTimeout   = 10 * time.Second
 )
 
 type Status struct {
@@ -43,6 +46,7 @@ type PreparedUpdate struct {
 
 type Client struct {
 	feedURL      string
+	manifestURL  string
 	downloadBase string
 	httpClient   *http.Client
 	platform     string
@@ -67,6 +71,12 @@ type atomLink struct {
 	Address  string `xml:"href,attr"`
 }
 
+type updateManifest struct {
+	Version     string `json:"version"`
+	PublishedAt string `json:"published_at"`
+	ReleaseURL  string `json:"release_url"`
+}
+
 type releaseAsset struct {
 	Name string
 	URL  string
@@ -81,11 +91,12 @@ type releaseSelection struct {
 func New() *Client {
 	return &Client{
 		feedURL:      releaseFeedURL,
+		manifestURL:  updateManifestURL,
 		downloadBase: "https://github.com/HONG-LOU/entcoin/releases/download/",
 		httpClient:   secureHTTPClient(),
 		platform:     runtime.GOOS,
 		architecture: runtime.GOARCH,
-		validateURL:  validateGitHubURL,
+		validateURL:  validateUpdateURL,
 	}
 }
 
@@ -121,9 +132,25 @@ func (c *Client) PrepareLatest(ctx context.Context) (PreparedUpdate, error) {
 }
 
 func (c *Client) latest(ctx context.Context) (releaseSelection, error) {
+	feedContext, cancelFeed := context.WithTimeout(ctx, metadataTimeout)
+	selection, feedErr := c.latestFromFeed(feedContext)
+	cancelFeed()
+	if feedErr == nil {
+		return selection, nil
+	}
+	manifestContext, cancelManifest := context.WithTimeout(ctx, metadataTimeout)
+	selection, manifestErr := c.latestFromManifest(manifestContext)
+	cancelManifest()
+	if manifestErr == nil {
+		return selection, nil
+	}
+	return releaseSelection{}, fmt.Errorf("check latest release: %w", errors.Join(feedErr, manifestErr))
+}
+
+func (c *Client) latestFromFeed(ctx context.Context) (releaseSelection, error) {
 	data, err := c.read(ctx, c.feedURL, maxMetadataBytes)
 	if err != nil {
-		return releaseSelection{}, fmt.Errorf("check latest release: %w", err)
+		return releaseSelection{}, fmt.Errorf("read GitHub release feed: %w", err)
 	}
 	var feed atomFeed
 	if err := xml.Unmarshal(data, &feed); err != nil {
@@ -133,20 +160,47 @@ func (c *Client) latest(ctx context.Context) (releaseSelection, error) {
 	if err != nil {
 		return releaseSelection{}, err
 	}
-	comparison, err := compareVersions(latestVersion, CurrentVersion)
-	if err != nil {
-		return releaseSelection{}, fmt.Errorf("validate release version: %w", err)
-	}
 	releaseURL, err := entry.releaseURL(latestVersion)
 	if err != nil {
 		return releaseSelection{}, err
+	}
+	return c.selectRelease(latestVersion, releaseURL, entry.Updated)
+}
+
+func (c *Client) latestFromManifest(ctx context.Context) (releaseSelection, error) {
+	if c.manifestURL == "" {
+		return releaseSelection{}, errors.New("update manifest fallback is not configured")
+	}
+	data, err := c.read(ctx, c.manifestURL, maxMetadataBytes)
+	if err != nil {
+		return releaseSelection{}, fmt.Errorf("read Entcoin update manifest: %w", err)
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+	var manifest updateManifest
+	if err := decoder.Decode(&manifest); err != nil {
+		return releaseSelection{}, fmt.Errorf("decode update manifest: %w", err)
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return releaseSelection{}, fmt.Errorf("decode update manifest: %w", err)
+	}
+	if err := validateGitHubReleaseURL(manifest.ReleaseURL, manifest.Version); err != nil {
+		return releaseSelection{}, err
+	}
+	return c.selectRelease(manifest.Version, manifest.ReleaseURL, manifest.PublishedAt)
+}
+
+func (c *Client) selectRelease(latestVersion, releaseURL, publishedAt string) (releaseSelection, error) {
+	comparison, err := compareVersions(latestVersion, CurrentVersion)
+	if err != nil {
+		return releaseSelection{}, fmt.Errorf("validate release version: %w", err)
 	}
 	status := Status{
 		CurrentVersion: CurrentVersion,
 		LatestVersion:  latestVersion,
 		Available:      comparison > 0,
 		ReleaseURL:     releaseURL,
-		PublishedAt:    entry.Updated,
+		PublishedAt:    publishedAt,
 	}
 	if !status.Available {
 		return releaseSelection{status: status}, nil
@@ -162,7 +216,38 @@ func (c *Client) latest(ctx context.Context) (releaseSelection, error) {
 	return releaseSelection{status: status, artifact: artifact, checksum: checksum}, nil
 }
 
+func ensureJSONEOF(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("unexpected trailing JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
 func (c *Client) read(ctx context.Context, address string, limit int64) ([]byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			delay := time.Duration(attempt) * 250 * time.Millisecond
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		data, err := c.readOnce(ctx, address, limit)
+		if err == nil {
+			return data, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func (c *Client) readOnce(ctx context.Context, address string, limit int64) ([]byte, error) {
 	if err := c.validateURL(address); err != nil {
 		return nil, err
 	}
@@ -170,7 +255,7 @@ func (c *Client) read(ctx context.Context, address string, limit int64) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Accept", "application/atom+xml, application/octet-stream")
+	request.Header.Set("Accept", "application/json, application/atom+xml, application/octet-stream")
 	request.Header.Set("User-Agent", "Entcoin/"+CurrentVersion)
 	response, err := c.httpClient.Do(request)
 	if err != nil {
@@ -271,9 +356,16 @@ func secureHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: 10 * time.Minute,
 		CheckRedirect: func(request *http.Request, _ []*http.Request) error {
-			return validateGitHubURL(request.URL.String())
+			return validateUpdateURL(request.URL.String())
 		},
 	}
+}
+
+func validateUpdateURL(raw string) error {
+	if raw == updateManifestURL {
+		return nil
+	}
+	return validateGitHubURL(raw)
 }
 
 func validateGitHubURL(raw string) error {

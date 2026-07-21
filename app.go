@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
@@ -199,13 +198,11 @@ func (a *App) InstallUpdate() (ActionResult, error) {
 	if err := updater.LaunchInstaller(prepared.Path); err != nil {
 		return ActionResult{}, err
 	}
-	if runtime.GOOS == "windows" {
-		go func() {
-			time.Sleep(time.Second)
-			wailsruntime.Quit(ctx)
-		}()
-	}
-	return ActionResult{Message: fmt.Sprintf("Entcoin %s installer opened", prepared.Status.LatestVersion)}, nil
+	go func() {
+		time.Sleep(time.Second)
+		wailsruntime.Quit(ctx)
+	}()
+	return ActionResult{Message: fmt.Sprintf("Entcoin %s update ready; restarting", prepared.Status.LatestVersion)}, nil
 }
 
 func (a *App) GetStartupState() StartupState {

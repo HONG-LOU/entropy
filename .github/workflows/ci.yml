@@ -42,7 +42,9 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm test
+          npm run build
 
       - name: Validate Windows seed deployment scripts
         shell: pwsh
@@ -92,6 +94,12 @@ jobs:
         run: |
           go test -count=1 ./...
           go vet ./...
+
+      - name: Test frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
 
       - name: Read package version
         run: |

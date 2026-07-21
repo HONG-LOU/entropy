@@ -3,6 +3,24 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
+## [Unreleased]
+
+## [1.0.8] - 2026-07-21
+
+### Added
+
+- Added `All`, `Received`, `Sent`, and `Mining` filters to the desktop
+  transaction history without changing the loaded history or detail view.
+- Added an HTTPS update-manifest fallback at `entcoin.xyz/update.json` for
+  desktop clients that cannot reach the GitHub release feed.
+
+### Changed
+
+- Desktop updates now install after checksum verification, close the current
+  process, and relaunch Entcoin automatically. Linux still requires the normal
+  Polkit authorization prompt, and unsigned Windows builds may show SmartScreen.
+- Update metadata and checksum downloads retry temporary network failures.
+
 ## [1.0.7] - 2026-07-21
 
 ### Changed

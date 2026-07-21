@@ -13,6 +13,8 @@ import (
 	"testing"
 )
 
+const testReleaseVersion = "1.0.9"
+
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
 		left  string
@@ -37,16 +39,16 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.9-rc1"},
-		{Title: "v1.0.8"},
+		{Title: "v1.0.10-rc1"},
+		{Title: "v1.0.9"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != "1.0.8" || entry.Title != "v1.0.8" {
-		t.Fatalf("latest stable entry = %q (%q), want v1.0.8", entry.Title, version)
+	if version != testReleaseVersion || entry.Title != "v"+testReleaseVersion {
+		t.Fatalf("latest stable entry = %q (%q), want v%s", entry.Title, version, testReleaseVersion)
 	}
 }
 
@@ -59,10 +61,10 @@ func TestCheckSelectsLinuxUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Available || status.CurrentVersion != CurrentVersion || status.LatestVersion != "1.0.8" {
+	if !status.Available || status.CurrentVersion != CurrentVersion || status.LatestVersion != testReleaseVersion {
 		t.Fatalf("unexpected update status: %#v", status)
 	}
-	if status.AssetName != "entcoin_1.0.8_amd64.deb" {
+	if status.AssetName != "entcoin_"+testReleaseVersion+"_amd64.deb" {
 		t.Fatalf("asset = %q", status.AssetName)
 	}
 }
@@ -110,9 +112,55 @@ func TestValidateGitHubURLRejectsUntrustedHost(t *testing.T) {
 	}
 }
 
+func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.T) {
+	if err := validateUpdateURL(updateManifestURL); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateUpdateURL("https://entcoin.xyz/other.json"); err == nil {
+		t.Fatal("unexpected Entcoin website URL was accepted")
+	}
+}
+
+func TestCheckFallsBackToWebsiteManifest(t *testing.T) {
+	client, server := testClient(t, []byte("verified deb payload"), false)
+	defer server.Close()
+	client.feedURL = server.URL + "/invalid-feed"
+	client.manifestURL = server.URL + "/manifest"
+
+	status, err := client.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Available || status.LatestVersion != testReleaseVersion {
+		t.Fatalf("unexpected manifest status: %#v", status)
+	}
+}
+
+func TestReadRetriesTemporaryFailures(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts < 3 {
+			http.Error(response, "temporary", http.StatusBadGateway)
+			return
+		}
+		_, _ = response.Write([]byte("ready"))
+	}))
+	defer server.Close()
+	client := &Client{httpClient: server.Client(), validateURL: func(string) error { return nil }}
+
+	data, err := client.read(context.Background(), server.URL, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "ready" || attempts != 3 {
+		t.Fatalf("read = %q after %d attempts", data, attempts)
+	}
+}
+
 func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptest.Server) {
 	t.Helper()
-	artifactName := "entcoin_1.0.8_amd64.deb"
+	artifactName := "entcoin_" + testReleaseVersion + "_amd64.deb"
 	checksum := sha256.Sum256(artifact)
 	checksumText := hex.EncodeToString(checksum[:])
 	if mismatch {
@@ -125,18 +173,22 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 			response.Header().Set("Content-Type", "application/atom+xml")
 			_ = xml.NewEncoder(response).Encode(atomFeed{Entries: []atomEntry{
 				{
-					Title:   "v1.0.8",
+					Title:   "v" + testReleaseVersion,
 					Updated: "2026-07-22T00:00:00Z",
 					Links: []atomLink{{
 						Relation: "alternate",
 						Type:     "text/html",
-						Address:  "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.8",
+						Address:  "https://github.com/HONG-LOU/entcoin/releases/tag/v" + testReleaseVersion,
 					}},
 				},
 			}})
-		case "/download/v1.0.8/" + artifactName:
+		case "/manifest":
+			_, _ = response.Write([]byte(`{"version":"` + testReleaseVersion + `","published_at":"2026-07-22T00:00:00Z","release_url":"https://github.com/HONG-LOU/entcoin/releases/tag/v` + testReleaseVersion + `"}`))
+		case "/invalid-feed":
+			_, _ = response.Write([]byte("not atom"))
+		case "/download/v" + testReleaseVersion + "/" + artifactName:
 			_, _ = response.Write(artifact)
-		case "/download/v1.0.8/SHA256SUMS-linux.txt":
+		case "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		default:
 			http.NotFound(response, request)
