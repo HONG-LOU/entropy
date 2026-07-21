@@ -3,7 +3,7 @@
 All notable changes are documented here. The protocol identity is the network
 compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
-## [Unreleased]
+## [1.0.7] - 2026-07-21
 
 ### Changed
 
@@ -13,6 +13,11 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
   with the live two-region public seed topology and local-validation model.
 - Kept `entropy-mainnet-v1`, `entropy.db`, and legacy Entropy data-directory
   detection unchanged as protocol and wallet compatibility identifiers.
+
+### Security
+
+- v1.0.7 Windows artifacts remain unsigned and may trigger Microsoft Defender
+  SmartScreen; published SHA-256 manifests cover every release executable.
 
 ## [1.0.6] - 2026-07-21
 

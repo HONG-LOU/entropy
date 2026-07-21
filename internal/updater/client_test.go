@@ -19,8 +19,8 @@ func TestCompareVersions(t *testing.T) {
 		right string
 		want  int
 	}{
-		{left: "1.0.6", right: "1.0.6"},
-		{left: "1.0.7", right: "1.0.6", want: 1},
+		{left: "1.0.7", right: "1.0.7"},
+		{left: "1.0.8", right: "1.0.7", want: 1},
 		{left: "1.1.0", right: "1.9.9", want: -1},
 	}
 	for _, test := range tests {
@@ -29,24 +29,24 @@ func TestCompareVersions(t *testing.T) {
 			t.Fatalf("compareVersions(%q, %q) = %d, %v; want %d", test.left, test.right, got, err, test.want)
 		}
 	}
-	if _, err := compareVersions("1.0", "1.0.6"); err == nil {
+	if _, err := compareVersions("1.0", "1.0.7"); err == nil {
 		t.Fatal("non-canonical version was accepted")
 	}
 }
 
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
-		{Title: "v1.0.6"},
-		{Title: "v1.0.8-rc1"},
 		{Title: "v1.0.7"},
+		{Title: "v1.0.9-rc1"},
+		{Title: "v1.0.8"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != "1.0.7" || entry.Title != "v1.0.7" {
-		t.Fatalf("latest stable entry = %q (%q), want v1.0.7", entry.Title, version)
+	if version != "1.0.8" || entry.Title != "v1.0.8" {
+		t.Fatalf("latest stable entry = %q (%q), want v1.0.8", entry.Title, version)
 	}
 }
 
@@ -59,10 +59,10 @@ func TestCheckSelectsLinuxUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Available || status.CurrentVersion != CurrentVersion || status.LatestVersion != "1.0.7" {
+	if !status.Available || status.CurrentVersion != CurrentVersion || status.LatestVersion != "1.0.8" {
 		t.Fatalf("unexpected update status: %#v", status)
 	}
-	if status.AssetName != "entcoin_1.0.7_amd64.deb" {
+	if status.AssetName != "entcoin_1.0.8_amd64.deb" {
 		t.Fatalf("asset = %q", status.AssetName)
 	}
 }
@@ -99,7 +99,7 @@ func TestPrepareLatestRejectsChecksumMismatch(t *testing.T) {
 }
 
 func TestValidateGitHubURLRejectsUntrustedHost(t *testing.T) {
-	if err := validateGitHubURL("https://github.com/HONG-LOU/entcoin/releases/download/v1.0.7/file"); err != nil {
+	if err := validateGitHubURL("https://github.com/HONG-LOU/entcoin/releases/download/v1.0.8/file"); err != nil {
 		t.Fatal(err)
 	}
 	if err := validateGitHubURL("https://example.com/entcoin.exe"); err == nil {
@@ -112,7 +112,7 @@ func TestValidateGitHubURLRejectsUntrustedHost(t *testing.T) {
 
 func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptest.Server) {
 	t.Helper()
-	artifactName := "entcoin_1.0.7_amd64.deb"
+	artifactName := "entcoin_1.0.8_amd64.deb"
 	checksum := sha256.Sum256(artifact)
 	checksumText := hex.EncodeToString(checksum[:])
 	if mismatch {
@@ -125,18 +125,18 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 			response.Header().Set("Content-Type", "application/atom+xml")
 			_ = xml.NewEncoder(response).Encode(atomFeed{Entries: []atomEntry{
 				{
-					Title:   "v1.0.7",
+					Title:   "v1.0.8",
 					Updated: "2026-07-22T00:00:00Z",
 					Links: []atomLink{{
 						Relation: "alternate",
 						Type:     "text/html",
-						Address:  "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.7",
+						Address:  "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.8",
 					}},
 				},
 			}})
-		case "/download/v1.0.7/" + artifactName:
+		case "/download/v1.0.8/" + artifactName:
 			_, _ = response.Write(artifact)
-		case "/download/v1.0.7/SHA256SUMS-linux.txt":
+		case "/download/v1.0.8/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		default:
 			http.NotFound(response, request)
