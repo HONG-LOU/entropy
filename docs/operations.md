@@ -1,6 +1,6 @@
 # Entcoin node operations
 
-This guide covers the v1.0.12 Windows/Ubuntu desktop node, headless CLI, and
+This guide covers the v1.0.13 Windows/Ubuntu desktop node, headless CLI, and
 optional public-seed deployment. The network identity is
 `entropy-mainnet-v1`; this compatibility label keeps existing Entcoin nodes,
 wallets, and chain data on the same network.
@@ -16,14 +16,14 @@ Release builds provide these Windows artifacts:
 
 Ubuntu 24.04+ amd64 releases additionally provide:
 
-- `entcoin_1.0.12_amd64.deb`: desktop application and CLI installer;
+- `entcoin_1.0.13_amd64.deb`: desktop application and CLI installer;
 - `entcoin-linux-amd64`: unpackaged desktop binary;
 - `entcoin-cli-linux-amd64`: unpackaged headless node;
 - `SHA256SUMS-linux.txt`: Linux artifact checksums.
 
 Verify Windows artifacts against `SHA256SUMS.txt` and Linux artifacts against
 `SHA256SUMS-linux.txt` from the same release before running them. Current
-v1.0.12 binaries are not code-signed, so a checksum proves only that the file matches
+v1.0.13 binaries are not code-signed, so a checksum proves only that the file matches
 the published release artifact, not that a trusted certificate authority
 verified its publisher.
 
@@ -48,7 +48,7 @@ strict `--listen` behavior so operator mistakes fail visibly.
 Microsoft WebView2 Runtime is required. It is normally present on current
 Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 
-Install Ubuntu packages with `sudo apt install ./entcoin_1.0.12_amd64.deb`, then
+Install Ubuntu packages with `sudo apt install ./entcoin_1.0.13_amd64.deb`, then
 launch **Entcoin** from the desktop menu or run `entcoin`. Ubuntu stores mainnet
 state under `~/.config/Entcoin/mainnet-v1`. The logged-in desktop session must
 provide an unlocked Secret Service keyring; the standard Ubuntu Desktop session
@@ -56,12 +56,13 @@ does so automatically.
 
 ### Desktop update flow
 
-Open **Diagnostics → Software update** to check the official stable GitHub
-Release. If the GitHub feed is unavailable, Entcoin retries and reads the
-bounded `https://entcoin.xyz/update.json` fallback. It selects the platform
-installer, limits metadata and download sizes, and fetches the GitHub Release
-checksum manifest. The installer itself comes from the exact versioned
-`entcoin.xyz/downloads/` mirror first and GitHub on failure. Interrupted files
+Open **Diagnostics → Software update** to check the bounded
+`https://entcoin.xyz/update.json` manifest first and the official stable GitHub
+Release feed on failure. Entcoin selects the platform installer, limits
+metadata and download sizes, and gives each metadata or checksum source a
+bounded timeout. The checksum manifest and installer come from exact versioned
+`entcoin.xyz/downloads/` URLs first and matching GitHub Release URLs on failure;
+invalid checksum content also advances to the next source. Interrupted files
 resume from the protected update cache with HTTP Range requests; a server that
 does not honor Range causes a safe restart from byte zero. The exact asset must
 still match `SHA256SUMS.txt` or `SHA256SUMS-linux.txt`. **Update and restart**
@@ -315,7 +316,7 @@ Remove-Item Env:\ENTCOIN_WALLET_PASSWORD
 ```
 
 The migration preserves the old P-256 key and address but does not migrate its
-testnet chain. There is intentionally no CLI restore command in v1.0.12; start
+testnet chain. There is intentionally no CLI restore command in v1.0.13; start
 the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
@@ -349,7 +350,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v1.0.12 wallet
+### New v1.0.13 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -427,7 +428,7 @@ For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
 copy of the old directory; the command validates the key and creates verified
 local OS protection and portable encrypted copies before removing plaintext.
 
-Then start v1.0.12 normally and restore the phrase or `.entwallet` from the
+Then start v1.0.13 normally and restore the phrase or `.entwallet` from the
 desktop Wallet view. This recovers only the P-256 key and address. Mainnet
 balances, spendable outputs, confirmations, and history are derived solely from
 the mainnet chain and begin independently of every testnet balance.

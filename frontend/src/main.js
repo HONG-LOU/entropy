@@ -240,7 +240,10 @@ function renderUpdateProgress(progress) {
     return;
   }
   resetUpdateProgress();
-  if (phase === "verifying") {
+  if (phase === "checking") {
+    if (label) label.textContent = "Checking";
+    setText("update-status", "Checking update integrity");
+  } else if (phase === "verifying") {
     if (label) label.textContent = "Verifying";
     setText("update-status", "Verifying downloaded update");
   } else if (phase === "installing") {
@@ -643,7 +646,7 @@ async function refreshDashboard() {
 function renderUpdate(status) {
   state.updateStatus = status;
   state.updateChecked = true;
-  setText("current-version", `v${status.current_version || "1.0.12"}`);
+  setText("current-version", `v${status.current_version || "1.0.13"}`);
   const available = Boolean(status.available);
   setText("update-status", available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date");
   $("install-update").hidden = !available;

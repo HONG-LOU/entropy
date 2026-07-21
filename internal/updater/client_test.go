@@ -11,11 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-const testReleaseVersion = "1.0.13"
+const testReleaseVersion = "1.0.14"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -41,11 +42,11 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.13-rc1"},
+		{Title: "v1.0.14-rc1"},
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
-		{Title: "v1.0.12"},
 		{Title: "v1.0.13"},
+		{Title: "v1.0.14"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -152,14 +153,14 @@ func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.
 	if err := validateUpdateURL("https://entcoin.xyz/other.json"); err == nil {
 		t.Fatal("unexpected Entcoin website URL was accepted")
 	}
-	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.12/entcoin_1.0.12_amd64.deb"); err != nil {
+	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.13/entcoin_1.0.13_amd64.deb"); err != nil {
 		t.Fatal(err)
 	}
 	for _, address := range []string{
-		"http://entcoin.xyz/downloads/v1.0.12/entcoin.exe",
-		"https://www.entcoin.xyz/downloads/v1.0.12/entcoin.exe",
+		"http://entcoin.xyz/downloads/v1.0.13/entcoin.exe",
+		"https://www.entcoin.xyz/downloads/v1.0.13/entcoin.exe",
 		"https://entcoin.xyz/downloads/../update.json",
-		"https://entcoin.xyz/downloads/v1.0.12/entcoin.exe?source=other",
+		"https://entcoin.xyz/downloads/v1.0.13/entcoin.exe?source=other",
 	} {
 		if err := validateUpdateURL(address); err == nil {
 			t.Fatalf("unexpected mirror URL was accepted: %s", address)
@@ -167,11 +168,9 @@ func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.
 	}
 }
 
-func TestCheckFallsBackToWebsiteManifest(t *testing.T) {
-	client, server, _ := testClient(t, []byte("verified deb payload"), false)
+func TestCheckPrefersWebsiteManifest(t *testing.T) {
+	client, server, state := testClient(t, []byte("verified deb payload"), false)
 	defer server.Close()
-	client.feedURL = server.URL + "/invalid-feed"
-	client.manifestURL = server.URL + "/manifest"
 
 	status, err := client.Check(context.Background())
 	if err != nil {
@@ -179,6 +178,103 @@ func TestCheckFallsBackToWebsiteManifest(t *testing.T) {
 	}
 	if !status.Available || status.LatestVersion != testReleaseVersion {
 		t.Fatalf("unexpected manifest status: %#v", status)
+	}
+	requests := state.requestPaths()
+	if len(requests) != 1 || requests[0] != "/manifest" || containsString(requests, "/feed") {
+		t.Fatalf("metadata requests = %v", requests)
+	}
+}
+
+func TestCheckFallsBackToGitHubFeed(t *testing.T) {
+	client, server, _ := testClient(t, []byte("verified deb payload"), false)
+	defer server.Close()
+	client.manifestURL = server.URL + "/missing-manifest"
+
+	status, err := client.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Available || status.LatestVersion != testReleaseVersion {
+		t.Fatalf("unexpected feed status: %#v", status)
+	}
+}
+
+func TestPrepareLatestUsesMirrorChecksumWithoutGitHub(t *testing.T) {
+	artifact := []byte("verified deb payload")
+	client, server, state := testClient(t, artifact, false)
+	defer server.Close()
+	client.mirrorBases = []string{server.URL + "/mirror/"}
+
+	if _, err := client.PrepareLatest(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	mirrorChecksum := "/mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
+	githubChecksum := "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
+	requests := state.requestPaths()
+	if !containsString(requests, mirrorChecksum) || containsString(requests, githubChecksum) {
+		t.Fatalf("checksum requests = %v", requests)
+	}
+}
+
+func TestPrepareLatestFallsBackFromInvalidMirrorChecksum(t *testing.T) {
+	artifact := []byte("verified deb payload")
+	client, server, state := testClient(t, artifact, false)
+	defer server.Close()
+	client.mirrorBases = []string{server.URL + "/bad-checksum/"}
+
+	if _, err := client.PrepareLatest(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	requests := state.requestPaths()
+	for _, prefix := range []string{"/bad-checksum/", "/download/"} {
+		found := false
+		for _, requestPath := range requests {
+			if strings.HasPrefix(requestPath, prefix) && strings.HasSuffix(requestPath, "SHA256SUMS-linux.txt") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("checksum requests = %v", requests)
+		}
+	}
+}
+
+func TestChecksumSourceTimeoutFallsBack(t *testing.T) {
+	artifactName := "entcoin_" + testReleaseVersion + "_amd64.deb"
+	checksum := sha256.Sum256([]byte("verified deb payload"))
+	checksumText := hex.EncodeToString(checksum[:]) + "  " + artifactName + "\n"
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/slow" {
+			<-request.Context().Done()
+			return
+		}
+		_, _ = response.Write([]byte(checksumText))
+	}))
+	defer server.Close()
+	client := &Client{
+		httpClient:      server.Client(),
+		validateURL:     func(string) error { return nil },
+		metadataTimeout: 20 * time.Millisecond,
+	}
+
+	expected, err := client.checksumForArtifact(context.Background(), releaseAsset{
+		URLs: []string{server.URL + "/slow", server.URL + "/good"},
+	}, artifactName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expected != hex.EncodeToString(checksum[:]) {
+		t.Fatalf("checksum = %q", expected)
+	}
+}
+
+func TestChecksumRequiresAtLeastOneSource(t *testing.T) {
+	client := &Client{}
+
+	_, err := client.checksumForArtifact(context.Background(), releaseAsset{}, "entcoin.deb")
+	if err == nil || !strings.Contains(err.Error(), "no checksum sources") {
+		t.Fatalf("missing checksum source error = %v", err)
 	}
 }
 
@@ -195,8 +291,9 @@ func TestPrepareLatestFallsBackFromMirrorToGitHub(t *testing.T) {
 	if _, err := os.Stat(prepared.Path); err != nil {
 		t.Fatal(err)
 	}
-	if len(state.paths) < 2 || !strings.HasPrefix(state.paths[0], "/missing/") || !strings.HasPrefix(state.paths[1], "/download/") {
-		t.Fatalf("download source order = %v", state.paths)
+	paths, _ := state.artifactRequests()
+	if len(paths) < 2 || !strings.HasPrefix(paths[0], "/missing/") || !strings.HasPrefix(paths[1], "/download/") {
+		t.Fatalf("download source order = %v", paths)
 	}
 }
 
@@ -221,8 +318,9 @@ func TestPrepareLatestResumesPartialArtifact(t *testing.T) {
 	if !bytes.Equal(data, artifact) {
 		t.Fatalf("resumed artifact = %q", data)
 	}
-	if len(state.ranges) != 1 || state.ranges[0] != "bytes=12-" {
-		t.Fatalf("artifact ranges = %v", state.ranges)
+	_, ranges := state.artifactRequests()
+	if len(ranges) != 1 || ranges[0] != "bytes=12-" {
+		t.Fatalf("artifact ranges = %v", ranges)
 	}
 }
 
@@ -267,8 +365,9 @@ func TestPrepareLatestRejectsBadMirrorAndDownloadsCleanFallback(t *testing.T) {
 	if !bytes.Equal(data, artifact) {
 		t.Fatalf("fallback artifact = %q", data)
 	}
-	if len(state.paths) < 2 || !strings.HasPrefix(state.paths[0], "/bad-mirror/") || !strings.HasPrefix(state.paths[1], "/download/") {
-		t.Fatalf("download source order = %v", state.paths)
+	paths, _ := state.artifactRequests()
+	if len(paths) < 2 || !strings.HasPrefix(paths[0], "/bad-mirror/") || !strings.HasPrefix(paths[1], "/download/") {
+		t.Fatalf("download source order = %v", paths)
 	}
 }
 
@@ -295,8 +394,32 @@ func TestReadRetriesTemporaryFailures(t *testing.T) {
 }
 
 type testServerState struct {
-	paths  []string
-	ranges []string
+	mu       sync.Mutex
+	paths    []string
+	ranges   []string
+	requests []string
+}
+
+func (s *testServerState) recordRequest(path, rangeHeader string, artifact bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests = append(s.requests, path)
+	if artifact {
+		s.paths = append(s.paths, path)
+		s.ranges = append(s.ranges, rangeHeader)
+	}
+}
+
+func (s *testServerState) requestPaths() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.requests...)
+}
+
+func (s *testServerState) artifactRequests() ([]string, []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.paths...), append([]string(nil), s.ranges...)
 }
 
 func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptest.Server, *testServerState) {
@@ -310,10 +433,11 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 	state := &testServerState{}
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if strings.Contains(request.URL.Path, artifactName) {
-			state.paths = append(state.paths, request.URL.Path)
-			state.ranges = append(state.ranges, request.Header.Get("Range"))
-		}
+		state.recordRequest(
+			request.URL.Path,
+			request.Header.Get("Range"),
+			strings.Contains(request.URL.Path, artifactName),
+		)
 		switch request.URL.Path {
 		case "/feed":
 			response.Header().Set("Content-Type", "application/atom+xml")
@@ -334,12 +458,19 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 			_, _ = response.Write([]byte("not atom"))
 		case "/download/v" + testReleaseVersion + "/" + artifactName:
 			http.ServeContent(response, request, artifactName, time.Time{}, bytes.NewReader(artifact))
+		case "/mirror/v" + testReleaseVersion + "/" + artifactName,
+			"/bad-checksum/v" + testReleaseVersion + "/" + artifactName:
+			http.ServeContent(response, request, artifactName, time.Time{}, bytes.NewReader(artifact))
 		case "/no-range/v" + testReleaseVersion + "/" + artifactName:
 			_, _ = response.Write(artifact)
 		case "/bad-mirror/v" + testReleaseVersion + "/" + artifactName:
 			_, _ = response.Write(bytes.Repeat([]byte("x"), len(artifact)))
 		case "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
+		case "/mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
+			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
+		case "/bad-checksum/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
+			_, _ = response.Write([]byte("not a checksum\n"))
 		case "/no-range/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		default:
@@ -347,13 +478,24 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 		}
 	}))
 	client := &Client{
-		feedURL:      server.URL + "/feed",
-		downloadBase: server.URL + "/download/",
-		httpClient:   server.Client(),
-		platform:     "linux",
-		architecture: "amd64",
-		cacheRoot:    t.TempDir(),
-		validateURL:  func(string) error { return nil },
+		feedURL:         server.URL + "/feed",
+		manifestURL:     server.URL + "/manifest",
+		downloadBase:    server.URL + "/download/",
+		httpClient:      server.Client(),
+		platform:        "linux",
+		architecture:    "amd64",
+		cacheRoot:       t.TempDir(),
+		validateURL:     func(string) error { return nil },
+		metadataTimeout: time.Second,
 	}
 	return client, server, state
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }

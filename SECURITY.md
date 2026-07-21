@@ -2,7 +2,7 @@
 
 ## Mainnet scope
 
-Entcoin v1.0.12 uses the compatibility identity `entropy-mainnet-v1`. The word
+Entcoin v1.0.13 uses the compatibility identity `entropy-mainnet-v1`. The word
 `mainnet` identifies which genesis and consensus rules a node accepts; it does
 not mean the implementation has received an independent security audit.
 
@@ -111,18 +111,20 @@ guaranteed response-time program.
   eclipse-resistant peer selection or automatic NAT traversal.
 - Built-in HTTPS manifest delivery is a discovery mechanism, not a trust root or
   consensus authority. A published seed cannot change locally validated rules.
-- Desktop update metadata is accepted only from the official GitHub release
-  feed or exact `entcoin.xyz/update.json` fallback. Installers may come from the
-  exact versioned `entcoin.xyz/downloads/` mirror or trusted GitHub HTTPS hosts,
-  but must match the checksum manifest fetched from the same GitHub Release.
-- v1.0.12 Windows binaries are not Authenticode-signed and may trigger
+- Desktop update metadata is accepted only from exact `entcoin.xyz/update.json`
+  or the official GitHub release feed. Installers and checksum manifests use
+  exact versioned `entcoin.xyz/downloads/` URLs first and matching GitHub
+  Release URLs on failure. SHA-256 detects corruption and source disagreement,
+  but when both files come from the mirror it is not an independent defense
+  against compromise of that server. Unsigned builds retain this limitation.
+- v1.0.13 Windows binaries are not Authenticode-signed and may trigger
   SmartScreen. Release CI signs and verifies every EXE when a CA-issued
   certificate is configured; builds are not yet reproducible.
 - P-256 addresses and mnemonic derivation are Entcoin-specific and not Bitcoin
   wallet compatible.
 - The node has no hardware-wallet integration, multisignature policy, wallet
   passphrase unlock mode, or process sandbox.
-- Network privacy is not a goal of v1.0.12. Peers observe IP addresses, timing, and
+- Network privacy is not a goal of v1.0.13. Peers observe IP addresses, timing, and
   the wallet address currently used as node ID.
 - A single node or a network controlled by one miner/operator provides little
   independent failure or censorship resistance.

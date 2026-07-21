@@ -21,15 +21,15 @@ import (
 )
 
 const (
-	CurrentVersion     = "1.0.12"
-	ReleasesURL        = "https://github.com/HONG-LOU/entcoin/releases/latest"
-	releaseFeedURL     = "https://github.com/HONG-LOU/entcoin/releases.atom"
-	updateManifestURL  = "https://entcoin.xyz/update.json"
-	mirrorDownloadBase = "https://entcoin.xyz/downloads/"
-	maxMetadataBytes   = 1 << 20
-	maxChecksumBytes   = 128 << 10
-	maxArtifactBytes   = 300 << 20
-	metadataTimeout    = 10 * time.Second
+	CurrentVersion         = "1.0.13"
+	ReleasesURL            = "https://github.com/HONG-LOU/entcoin/releases/latest"
+	releaseFeedURL         = "https://github.com/HONG-LOU/entcoin/releases.atom"
+	updateManifestURL      = "https://entcoin.xyz/update.json"
+	mirrorDownloadBase     = "https://entcoin.xyz/downloads/"
+	maxMetadataBytes       = 1 << 20
+	maxChecksumBytes       = 128 << 10
+	maxArtifactBytes       = 300 << 20
+	defaultMetadataTimeout = 10 * time.Second
 )
 
 type Status struct {
@@ -56,15 +56,16 @@ type Progress struct {
 type ProgressReporter func(Progress)
 
 type Client struct {
-	feedURL      string
-	manifestURL  string
-	downloadBase string
-	mirrorBases  []string
-	httpClient   *http.Client
-	platform     string
-	architecture string
-	cacheRoot    string
-	validateURL  func(string) error
+	feedURL         string
+	manifestURL     string
+	downloadBase    string
+	mirrorBases     []string
+	httpClient      *http.Client
+	platform        string
+	architecture    string
+	cacheRoot       string
+	validateURL     func(string) error
+	metadataTimeout time.Duration
 }
 
 type atomFeed struct {
@@ -102,14 +103,15 @@ type releaseSelection struct {
 
 func New() *Client {
 	return &Client{
-		feedURL:      releaseFeedURL,
-		manifestURL:  updateManifestURL,
-		downloadBase: "https://github.com/HONG-LOU/entcoin/releases/download/",
-		mirrorBases:  []string{mirrorDownloadBase},
-		httpClient:   secureHTTPClient(),
-		platform:     runtime.GOOS,
-		architecture: runtime.GOARCH,
-		validateURL:  validateUpdateURL,
+		feedURL:         releaseFeedURL,
+		manifestURL:     updateManifestURL,
+		downloadBase:    "https://github.com/HONG-LOU/entcoin/releases/download/",
+		mirrorBases:     []string{mirrorDownloadBase},
+		httpClient:      secureHTTPClient(),
+		platform:        runtime.GOOS,
+		architecture:    runtime.GOARCH,
+		validateURL:     validateUpdateURL,
+		metadataTimeout: defaultMetadataTimeout,
 	}
 }
 
@@ -130,13 +132,10 @@ func (c *Client) PrepareLatest(ctx context.Context, report ProgressReporter) (Pr
 	if !selection.status.Available {
 		return PreparedUpdate{}, errors.New("Entcoin is already up to date")
 	}
-	checksumData, err := c.read(ctx, selection.checksum.URLs[0], maxChecksumBytes)
+	reportProgress(report, "checking", 0, 0)
+	expected, err := c.checksumForArtifact(ctx, selection.checksum, selection.artifact.Name)
 	if err != nil {
 		return PreparedUpdate{}, fmt.Errorf("download release checksums: %w", err)
-	}
-	expected, err := checksumFor(checksumData, selection.artifact.Name)
-	if err != nil {
-		return PreparedUpdate{}, err
 	}
 	path, err := c.downloadArtifact(ctx, selection.artifact, expected, report)
 	if err != nil {
@@ -146,19 +145,19 @@ func (c *Client) PrepareLatest(ctx context.Context, report ProgressReporter) (Pr
 }
 
 func (c *Client) latest(ctx context.Context) (releaseSelection, error) {
-	feedContext, cancelFeed := context.WithTimeout(ctx, metadataTimeout)
-	selection, feedErr := c.latestFromFeed(feedContext)
-	cancelFeed()
-	if feedErr == nil {
-		return selection, nil
-	}
-	manifestContext, cancelManifest := context.WithTimeout(ctx, metadataTimeout)
+	manifestContext, cancelManifest := context.WithTimeout(ctx, c.metadataDeadline())
 	selection, manifestErr := c.latestFromManifest(manifestContext)
 	cancelManifest()
 	if manifestErr == nil {
 		return selection, nil
 	}
-	return releaseSelection{}, fmt.Errorf("check latest release: %w", errors.Join(feedErr, manifestErr))
+	feedContext, cancelFeed := context.WithTimeout(ctx, c.metadataDeadline())
+	selection, feedErr := c.latestFromFeed(feedContext)
+	cancelFeed()
+	if feedErr == nil {
+		return selection, nil
+	}
+	return releaseSelection{}, fmt.Errorf("check latest release: %w", errors.Join(manifestErr, feedErr))
 }
 
 func (c *Client) latestFromFeed(ctx context.Context) (releaseSelection, error) {
@@ -230,7 +229,12 @@ func (c *Client) selectRelease(latestVersion, releaseURL, publishedAt string) (r
 	}
 	artifactURLs = append(artifactURLs, githubBase+artifactName)
 	artifact := releaseAsset{Name: artifactName, URLs: artifactURLs}
-	checksum := releaseAsset{Name: checksumName, URLs: []string{githubBase + checksumName}}
+	checksumURLs := make([]string, 0, len(c.mirrorBases)+1)
+	for _, base := range c.mirrorBases {
+		checksumURLs = append(checksumURLs, base+"v"+latestVersion+"/"+checksumName)
+	}
+	checksumURLs = append(checksumURLs, githubBase+checksumName)
+	checksum := releaseAsset{Name: checksumName, URLs: checksumURLs}
 	status.AssetName = artifactName
 	return releaseSelection{status: status, artifact: artifact, checksum: checksum}, nil
 }
@@ -264,6 +268,34 @@ func (c *Client) read(ctx context.Context, address string, limit int64) ([]byte,
 		lastErr = err
 	}
 	return nil, lastErr
+}
+
+func (c *Client) checksumForArtifact(ctx context.Context, checksum releaseAsset, artifactName string) (string, error) {
+	if len(checksum.URLs) == 0 {
+		return "", errors.New("no checksum sources are configured")
+	}
+	var sourceErrors []error
+	for _, address := range checksum.URLs {
+		sourceContext, cancel := context.WithTimeout(ctx, c.metadataDeadline())
+		data, err := c.read(sourceContext, address, maxChecksumBytes)
+		cancel()
+		if err == nil {
+			var expected string
+			expected, err = checksumFor(data, artifactName)
+			if err == nil {
+				return expected, nil
+			}
+		}
+		sourceErrors = append(sourceErrors, fmt.Errorf("%s: %w", downloadHost(address), err))
+	}
+	return "", errors.Join(sourceErrors...)
+}
+
+func (c *Client) metadataDeadline() time.Duration {
+	if c.metadataTimeout > 0 {
+		return c.metadataTimeout
+	}
+	return defaultMetadataTimeout
 }
 
 func (c *Client) readOnce(ctx context.Context, address string, limit int64) ([]byte, error) {

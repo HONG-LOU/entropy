@@ -216,6 +216,7 @@ const zh = Object.freeze({
   "Downloading and verifying the update": "正在下载并校验更新",
   "Preparing": "正在准备",
   "Preparing update": "正在准备更新",
+  "Checking update integrity": "正在检查安装包",
   "Verifying": "正在校验",
   "Verifying downloaded update": "正在校验下载文件",
   "Installing": "正在安装",

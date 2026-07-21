@@ -5,6 +5,17 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-07-21
+
+### Fixed
+
+- Update checks now prefer the official website manifest and use GitHub as a
+  bounded fallback instead of making every install wait for GitHub first.
+- Versioned checksum manifests now use the official mirror first, fall back to
+  the matching GitHub Release, reject invalid source content, and enforce a
+  short timeout per source instead of leaving the UI in Preparing for minutes.
+- The desktop reports a distinct integrity-check phase before artifact download.
+
 ## [1.0.12] - 2026-07-21
 
 ### Changed
