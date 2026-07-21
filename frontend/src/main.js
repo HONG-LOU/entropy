@@ -39,7 +39,6 @@ import {
   X,
   createIcons,
 } from "lucide";
-import { EventsOn } from "../wailsjs/runtime/runtime.js";
 import "./style.css";
 import { transactionKind } from "./transaction-filter.js";
 import { currentLocale, initializeI18n, onLanguageChange, toggleLanguage, translate, translateError } from "./i18n.js";
@@ -1363,7 +1362,9 @@ async function heartbeat() {
 }
 
 initializeI18n();
-if (window.runtime?.EventsOnMultiple) EventsOn("entcoin:update-progress", renderUpdateProgress);
+if (window.runtime?.EventsOnMultiple) {
+  window.runtime.EventsOnMultiple("entcoin:update-progress", renderUpdateProgress, -1);
+}
 onLanguageChange(() => {
   if (state.dashboard) renderDashboard(state.dashboard);
   if (state.history.length > 0) renderHistory(state.history);
