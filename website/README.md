@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File website/tools/generate-social-preview.p
 
 - Protocol and implementation claims are derived from the repository docs.
 - The same-origin status endpoint accepts only `entropy-mainnet-v1` responses.
-- Release links use versioned files under `https://entcoin.xyz/downloads/`.
+- Release links use versioned files under `https://template-chat.xyz/downloads/`.
   Every mirror file must byte-match the corresponding official GitHub Release
   SHA-256 manifest.
 - The open-network section describes the two-region public seed topology and local validation boundary.

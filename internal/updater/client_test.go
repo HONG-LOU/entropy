@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const testReleaseVersion = "1.0.15"
+const testReleaseVersion = "1.0.16"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -42,11 +42,11 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.15-rc1"},
+		{Title: "v1.0.16-rc1"},
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
-		{Title: "v1.0.14"},
 		{Title: "v1.0.15"},
+		{Title: "v1.0.16"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -153,18 +153,41 @@ func TestValidateUpdateURLAllowsOnlyTheOfficialManifestOutsideGitHub(t *testing.
 	if err := validateUpdateURL("https://entcoin.xyz/other.json"); err == nil {
 		t.Fatal("unexpected Entcoin website URL was accepted")
 	}
-	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.14/entcoin_1.0.14_amd64.deb"); err != nil {
+	if err := validateUpdateURL("https://entcoin.xyz/downloads/v1.0.15/entcoin_1.0.15_amd64.deb"); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateUpdateURL("https://template-chat.xyz/downloads/v1.0.15/entcoin_1.0.15_amd64.deb"); err != nil {
 		t.Fatal(err)
 	}
 	for _, address := range []string{
-		"http://entcoin.xyz/downloads/v1.0.14/entcoin.exe",
-		"https://www.entcoin.xyz/downloads/v1.0.14/entcoin.exe",
+		"http://entcoin.xyz/downloads/v1.0.15/entcoin.exe",
+		"https://www.entcoin.xyz/downloads/v1.0.15/entcoin.exe",
 		"https://entcoin.xyz/downloads/../update.json",
-		"https://entcoin.xyz/downloads/v1.0.14/entcoin.exe?source=other",
+		"https://entcoin.xyz/downloads/v1.0.15/entcoin.exe?source=other",
+		"https://template-chat.xyz/v2/status",
 	} {
 		if err := validateUpdateURL(address); err == nil {
 			t.Fatalf("unexpected mirror URL was accepted: %s", address)
 		}
+	}
+}
+
+func TestNewPrefersAsianMirror(t *testing.T) {
+	client := New()
+	selection, err := client.selectRelease(
+		testReleaseVersion,
+		"https://github.com/HONG-LOU/entcoin/releases/tag/v"+testReleaseVersion,
+		"2026-07-22T00:00:00Z",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPrefix := asianMirrorDownloadBase + "v" + testReleaseVersion + "/"
+	if len(selection.artifact.URLs) != 3 || !strings.HasPrefix(selection.artifact.URLs[0], wantPrefix) {
+		t.Fatalf("artifact sources = %v", selection.artifact.URLs)
+	}
+	if len(selection.checksum.URLs) != 3 || !strings.HasPrefix(selection.checksum.URLs[0], wantPrefix) {
+		t.Fatalf("checksum sources = %v", selection.checksum.URLs)
 	}
 }
 

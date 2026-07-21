@@ -5,6 +5,16 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-07-21
+
+### Changed
+
+- Desktop updates now prefer the Alibaba Cloud Asia mirror for both checksum
+  manifests and installers, with the US website mirror and GitHub Release as
+  verified fallbacks.
+- The Asia mirror serves immutable version directories with HTTP Range support
+  alongside the existing archive seed without changing node traffic.
+
 ## [1.0.14] - 2026-07-21
 
 ### Changed

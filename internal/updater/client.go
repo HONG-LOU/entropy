@@ -21,15 +21,16 @@ import (
 )
 
 const (
-	CurrentVersion         = "1.0.14"
-	ReleasesURL            = "https://github.com/HONG-LOU/entcoin/releases/latest"
-	releaseFeedURL         = "https://github.com/HONG-LOU/entcoin/releases.atom"
-	updateManifestURL      = "https://entcoin.xyz/update.json"
-	mirrorDownloadBase     = "https://entcoin.xyz/downloads/"
-	maxMetadataBytes       = 1 << 20
-	maxChecksumBytes       = 128 << 10
-	maxArtifactBytes       = 300 << 20
-	defaultMetadataTimeout = 10 * time.Second
+	CurrentVersion          = "1.0.15"
+	ReleasesURL             = "https://github.com/HONG-LOU/entcoin/releases/latest"
+	releaseFeedURL          = "https://github.com/HONG-LOU/entcoin/releases.atom"
+	updateManifestURL       = "https://entcoin.xyz/update.json"
+	asianMirrorDownloadBase = "https://template-chat.xyz/downloads/"
+	mirrorDownloadBase      = "https://entcoin.xyz/downloads/"
+	maxMetadataBytes        = 1 << 20
+	maxChecksumBytes        = 128 << 10
+	maxArtifactBytes        = 300 << 20
+	defaultMetadataTimeout  = 10 * time.Second
 )
 
 type Status struct {
@@ -106,7 +107,7 @@ func New() *Client {
 		feedURL:         releaseFeedURL,
 		manifestURL:     updateManifestURL,
 		downloadBase:    "https://github.com/HONG-LOU/entcoin/releases/download/",
-		mirrorBases:     []string{mirrorDownloadBase},
+		mirrorBases:     []string{asianMirrorDownloadBase, mirrorDownloadBase},
 		httpClient:      secureHTTPClient(),
 		platform:        runtime.GOOS,
 		architecture:    runtime.GOARCH,
@@ -596,7 +597,8 @@ func validateMirrorURL(raw string) error {
 	if err != nil {
 		return err
 	}
-	if parsed.Scheme != "https" || parsed.User != nil || parsed.Host != "entcoin.xyz" ||
+	trustedHost := parsed.Host == "entcoin.xyz" || parsed.Host == "template-chat.xyz"
+	if parsed.Scheme != "https" || parsed.User != nil || !trustedHost ||
 		parsed.RawQuery != "" || parsed.Fragment != "" || !mirrorPathPattern.MatchString(parsed.EscapedPath()) {
 		return errors.New("update URL is not an official Entcoin mirror URL")
 	}
