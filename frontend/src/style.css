@@ -64,6 +64,24 @@ svg { stroke-width: 1.8; }
 .brand-block strong { display: block; font-size: 16px; line-height: 19px; }
 .brand-block span { display: block; color: #aeb7b3; font-size: 11px; line-height: 15px; }
 .topbar-actions { min-width: 0; gap: 12px; }
+.language-toggle {
+  height: 30px;
+  min-width: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: #d5dad8;
+  background: transparent;
+  border: 1px solid #4b5450;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.language-toggle:hover { color: #fff; background: #29302d; border-color: #66706b; }
+.language-toggle:focus-visible { outline: 2px solid #69c994; outline-offset: 2px; }
+.language-toggle svg { width: 14px; height: 14px; }
 .topbar-update { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; color: #dff5e9; background: #225e45; border: 1px solid #39775c; border-radius: 4px; font-size: 10px; font-weight: 750; }
 .topbar-update:hover { background: #2b7255; }
 .topbar-update svg { width: 13px; height: 13px; }
@@ -524,6 +542,9 @@ dialog.modal[open] { display: grid; place-items: center; }
 
 @media (max-width: 480px) {
   .brand-block span { display: none; }
+  .topbar-actions { gap: 8px; }
+  .language-toggle { min-width: 30px; width: 30px; padding: 0; }
+  .language-toggle span { display: none; }
   .node-state > span:not(.status-dot) { display: none; }
   .view-tab span { display: none; }
   .view-tab { width: 44px; justify-content: center; padding: 0; }

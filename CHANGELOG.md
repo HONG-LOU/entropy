@@ -5,6 +5,22 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-07-21
+
+### Added
+
+- Added complete English and Simplified Chinese desktop interfaces for Windows
+  and Linux, including startup, wallet, transactions, mining, diagnostics,
+  storage, updates, dialogs, validation, and operation feedback.
+- Added a compact language control that follows the operating-system language
+  on first launch and remembers the user's selection afterward.
+
+### Changed
+
+- Dates and numeric values now follow the selected desktop language, while
+  protocol identifiers, addresses, hashes, file types, and currency symbols
+  retain their exact technical representation.
+
 ## [1.0.8] - 2026-07-21
 
 ### Added

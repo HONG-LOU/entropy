@@ -15,6 +15,7 @@ import {
   FileKey,
   History,
   KeyRound,
+  Languages,
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
@@ -40,6 +41,7 @@ import {
 } from "lucide";
 import "./style.css";
 import { filterTransactions, transactionKind } from "./transaction-filter.js";
+import { currentLocale, initializeI18n, onLanguageChange, toggleLanguage, translate, translateError } from "./i18n.js";
 
 const appIcons = {
   Activity,
@@ -58,6 +60,7 @@ const appIcons = {
   FileKey,
   History,
   KeyRound,
+  Languages,
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
@@ -145,7 +148,7 @@ function formatAmount(value) {
   const text = String(value ?? "0");
   const [whole, fraction] = text.split(".");
   try {
-    const grouped = BigInt(whole || "0").toLocaleString("en-US");
+    const grouped = BigInt(whole || "0").toLocaleString(currentLocale());
     return fraction === undefined ? grouped : `${grouped}.${fraction}`;
   } catch {
     return text;
@@ -157,7 +160,7 @@ function formatTimestamp(timestamp) {
   if (seconds <= 0) return "--";
   const date = new Date(seconds * 1000);
   if (Number.isNaN(date.getTime())) return "--";
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(currentLocale(), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -170,7 +173,7 @@ function formatTimestamp(timestamp) {
 function formatBytes(value) {
   let bytes = asNumber(value, -1);
   if (bytes < 0) return "--";
-  if (bytes < 1024) return `${bytes.toLocaleString()} B`;
+  if (bytes < 1024) return `${bytes.toLocaleString(currentLocale())} B`;
   const units = ["KiB", "MiB", "GiB", "TiB"];
   let unit = -1;
   do {
@@ -181,9 +184,9 @@ function formatBytes(value) {
 }
 
 function errorMessage(error) {
-  if (typeof error === "string") return error;
-  if (error?.message) return error.message;
-  return "The operation failed";
+  if (typeof error === "string") return translateError(error);
+  if (error?.message) return translateError(error.message);
+  return translate("The operation failed");
 }
 
 function showToast(message, type = "success") {
@@ -206,9 +209,7 @@ function setButtonBusy(button, busy, busyLabel = "Working") {
     button.classList.add("button-busy");
     button.disabled = true;
   } else {
-    if (label && button.dataset.originalLabel && label.textContent === button.dataset.busyLabel) {
-      label.textContent = button.dataset.originalLabel;
-    }
+    if (label && button.dataset.originalLabel) label.textContent = button.dataset.originalLabel;
     delete button.dataset.originalLabel;
     delete button.dataset.busyLabel;
     button.classList.remove("button-busy");
@@ -229,7 +230,7 @@ function validatePassword(password) {
 function updatePasswordCount(inputID, outputID) {
   const bytes = passwordBytes($(inputID).value);
   const output = $(outputID);
-  output.textContent = `${bytes.toLocaleString()} bytes`;
+  output.textContent = `${bytes.toLocaleString(currentLocale())} bytes`;
   output.classList.toggle("invalid", bytes > 0 && (bytes < 12 || bytes > 1024));
 }
 
@@ -267,7 +268,7 @@ function renderBlocks(blocks) {
     const row = body.insertRow();
     const height = row.insertCell();
     const heightValue = document.createElement("strong");
-    heightValue.textContent = `#${asNumber(block.height).toLocaleString()}`;
+    heightValue.textContent = `#${asNumber(block.height).toLocaleString(currentLocale())}`;
     height.append(heightValue);
 
     const hash = row.insertCell();
@@ -277,15 +278,15 @@ function renderBlocks(blocks) {
     hash.append(hashValue);
 
     row.insertCell().textContent = formatTimestamp(block.timestamp);
-    row.insertCell().textContent = asNumber(block.transactions).toLocaleString();
-    row.insertCell().textContent = asNumber(block.difficulty).toLocaleString();
+    row.insertCell().textContent = asNumber(block.transactions).toLocaleString(currentLocale());
+    row.insertCell().textContent = asNumber(block.difficulty).toLocaleString(currentLocale());
   }
 }
 
 function renderWalletProfiles(profiles, mining) {
   const list = $("wallet-profile-list");
   list.replaceChildren();
-  setText("wallet-count", profiles.length.toLocaleString());
+  setText("wallet-count", profiles.length.toLocaleString(currentLocale()));
   if (profiles.length === 0) {
     const empty = document.createElement("li");
     empty.className = "empty-row";
@@ -362,7 +363,7 @@ function renderSync(data) {
   const localHeight = asNumber(data.height);
   const reportedBest = asNumber(data.best_peer_height);
   const bestHeight = Math.max(localHeight, reportedBest);
-  setText("best-peer-height", bestHeight.toLocaleString());
+  setText("best-peer-height", bestHeight.toLocaleString(currentLocale()));
 
   const progress = $("sync-progress");
   const syncIcon = $("sync-icon");
@@ -383,7 +384,7 @@ function renderSync(data) {
   } else if (data.syncing) {
     setText("sync-label", "Synchronizing chain");
     setText("sync-detail", reportedBest > localHeight
-      ? `Local #${localHeight.toLocaleString()} of #${reportedBest.toLocaleString()}`
+      ? `Local #${localHeight.toLocaleString(currentLocale())} of #${reportedBest.toLocaleString(currentLocale())}`
       : "Validating peer data");
     if (reportedBest > 0) {
       progress.style.width = `${Math.min(100, (localHeight / reportedBest) * 100)}%`;
@@ -395,13 +396,13 @@ function renderSync(data) {
     networkHealth.classList.add("syncing");
   } else if (reportedBest > localHeight) {
     setText("sync-label", "Peer chain is ahead");
-    setText("sync-detail", `Local #${localHeight.toLocaleString()} | peer #${reportedBest.toLocaleString()}`);
+    setText("sync-detail", `Local #${localHeight.toLocaleString(currentLocale())} | peer #${reportedBest.toLocaleString(currentLocale())}`);
     progress.style.width = `${Math.min(100, (localHeight / reportedBest) * 100)}%`;
     networkHealth.textContent = "Behind";
     networkHealth.classList.add("syncing");
   } else {
     setText("sync-label", "Chain synchronized");
-    setText("sync-detail", `Validated through block #${localHeight.toLocaleString()}`);
+    setText("sync-detail", `Validated through block #${localHeight.toLocaleString(currentLocale())}`);
     progress.style.width = "100%";
     networkHealth.textContent = onlinePeers > 0 ? "Online" : "Offline";
     networkHealth.classList.add(onlinePeers > 0 ? "online" : "offline");
@@ -417,10 +418,10 @@ function renderDashboard(data) {
   setText("spendable-balance", formatAmount(data.spendable_balance));
   setText("wallet-address", data.address || "Unavailable");
   setText("wallet-page-address", data.address || "Unavailable");
-  setText("height", localHeight.toLocaleString());
-  setText("pending-count", asNumber(data.pending_count).toLocaleString());
-  setText("difficulty", asNumber(data.difficulty).toLocaleString());
-  setText("target-seconds", asNumber(data.target_block_seconds).toLocaleString());
+  setText("height", localHeight.toLocaleString(currentLocale()));
+  setText("pending-count", asNumber(data.pending_count).toLocaleString(currentLocale()));
+  setText("difficulty", asNumber(data.difficulty).toLocaleString(currentLocale()));
+  setText("target-seconds", asNumber(data.target_block_seconds).toLocaleString(currentLocale()));
   setText("issued", formatAmount(data.issued));
   setText("max-supply", formatAmount(data.max_supply));
   setText("next-reward", formatAmount(data.next_subsidy));
@@ -454,19 +455,19 @@ function renderDashboard(data) {
     storageMode.textContent = "Archive going forward / previously pruned";
     storageMode.classList.add("pruned");
   } else {
-    storageMode.textContent = `Pruned | keep ${pruneDepth.toLocaleString()}`;
+    storageMode.textContent = `Pruned | keep ${pruneDepth.toLocaleString(currentLocale())}`;
     storageMode.classList.add("pruned");
   }
-  setText("prune-depth", pruneDepth > 0 ? `${pruneDepth.toLocaleString()} recent blocks` : "No future pruning");
+  setText("prune-depth", pruneDepth > 0 ? `${pruneDepth.toLocaleString(currentLocale())} recent blocks` : "No future pruning");
   setText("pruned-through", prunedThrough > 0
-    ? `Block #${prunedThrough.toLocaleString()}`
+    ? `Block #${prunedThrough.toLocaleString(currentLocale())}`
     : pruneDepth > 0 ? "Retention enabled; no eligible blocks yet" : "Not pruned");
   setText("diagnostic-protocol", data.protocol || "Unknown");
   setText("diagnostic-listen", data.listen_address || "Not listening");
-  setText("diagnostic-tip", data.tip_hash ? `#${localHeight.toLocaleString()} ${shortHash(data.tip_hash, 20)}` : "Unavailable");
+  setText("diagnostic-tip", data.tip_hash ? `#${localHeight.toLocaleString(currentLocale())} ${shortHash(data.tip_hash, 20)}` : "Unavailable");
   $("diagnostic-tip").title = String(data.tip_hash || "");
-  setText("emission-blocks", `${asNumber(data.emission_blocks).toLocaleString()} blocks at ${asNumber(data.target_block_seconds).toLocaleString()} seconds`);
-  setText("last-error", data.last_error || "None");
+  setText("emission-blocks", `${asNumber(data.emission_blocks).toLocaleString(currentLocale())} blocks at ${asNumber(data.target_block_seconds).toLocaleString(currentLocale())} seconds`);
+  setText("last-error", data.last_error ? translateError(data.last_error) : "None");
   $("last-error").classList.toggle("error-text", Boolean(data.last_error));
 
   const health = $("health-label");
@@ -517,8 +518,8 @@ function renderHistory(transactions) {
   const body = $("history-body");
   body.replaceChildren();
   const filtered = filterTransactions(transactions, state.historyFilter);
-  setText("history-count", filtered.length.toLocaleString());
-  setText("history-total", transactions.length.toLocaleString());
+  setText("history-count", filtered.length.toLocaleString(currentLocale()));
+  setText("history-total", transactions.length.toLocaleString(currentLocale()));
 
   if (filtered.length === 0) {
     const row = body.insertRow();
@@ -577,8 +578,8 @@ function renderHistory(transactions) {
     } else {
       const confirmations = asNumber(transaction.confirmations);
       badge.className = "status-badge confirmed";
-      badge.append(icon("circle-check"), document.createTextNode(`${confirmations.toLocaleString()} confirmation${confirmations === 1 ? "" : "s"}`));
-      if (transaction.block_height != null) badge.title = `Block #${asNumber(transaction.block_height).toLocaleString()}`;
+      badge.append(icon("circle-check"), document.createTextNode(`${confirmations.toLocaleString(currentLocale())} confirmation${confirmations === 1 ? "" : "s"}`));
+      if (transaction.block_height != null) badge.title = `Block #${asNumber(transaction.block_height).toLocaleString(currentLocale())}`;
     }
     statusCell.append(badge);
     row.append(statusCell);
@@ -608,7 +609,7 @@ async function refreshDashboard() {
 function renderUpdate(status) {
   state.updateStatus = status;
   state.updateChecked = true;
-  setText("current-version", `v${status.current_version || "1.0.8"}`);
+  setText("current-version", `v${status.current_version || "1.0.9"}`);
   const available = Boolean(status.available);
   setText("update-status", available ? `Entcoin v${status.latest_version} is available` : "Entcoin is up to date");
   $("install-update").hidden = !available;
@@ -674,13 +675,13 @@ function detailValue(label, value, asCode = false) {
 function transactionStatus(transaction) {
   if (transaction.pending) return "Pending in local pool";
   const confirmations = asNumber(transaction.confirmations);
-  return `${confirmations.toLocaleString()} confirmation${confirmations === 1 ? "" : "s"}`;
+  return `${confirmations.toLocaleString(currentLocale())} confirmation${confirmations === 1 ? "" : "s"}`;
 }
 
 function transactionEntries(title, entries, format, asCode, emptyMessage) {
   const section = document.createElement("section");
   const heading = document.createElement("h3");
-  heading.textContent = `${title} (${entries.length.toLocaleString()})`;
+  heading.textContent = `${title} (${entries.length.toLocaleString(currentLocale())})`;
   const list = document.createElement("ol");
   if (entries.length === 0) {
     const item = document.createElement("li");
@@ -723,9 +724,9 @@ function openTransactionDetails(transaction) {
   );
   if (transaction.block_height != null) {
     overview.append(
-      detailValue("Block height", `#${asNumber(transaction.block_height).toLocaleString()}`),
+      detailValue("Block height", `#${asNumber(transaction.block_height).toLocaleString(currentLocale())}`),
       detailValue("Block hash", transaction.block_hash || "Unavailable", true),
-      detailValue("Position", asNumber(transaction.block_position).toLocaleString()),
+      detailValue("Position", asNumber(transaction.block_position).toLocaleString(currentLocale())),
     );
   }
   if (transaction.pruned) overview.append(detailValue("Body", "Pruned locally; indexed wallet totals remain available"));
@@ -765,7 +766,7 @@ async function refreshHistory(force = false) {
     state.history = history;
     state.lastHistoryRefresh = Date.now();
     renderHistory(history);
-    setText("history-updated", `Updated ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`);
+    setText("history-updated", `Updated ${new Intl.DateTimeFormat(currentLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`);
   } catch (error) {
     if (force || state.history.length === 0) showToast(errorMessage(error), "error");
     if (state.history.length === 0) {
@@ -798,7 +799,9 @@ async function checkStartup() {
   try {
     const startup = await invoke("GetStartupState");
     state.startupCode = startup.code || "starting";
-    setText("startup-message", startup.message || "Opening wallet and ledger...");
+    setText("startup-message", startup.code === "startup_failed"
+      ? translateError(startup.message)
+      : translate(startup.message || "Opening wallet and ledger..."));
 
     if (startup.ready || startup.code === "ready") {
       state.ready = true;
@@ -811,7 +814,7 @@ async function checkStartup() {
     if (startup.code === "wallet_migration_required") {
       showStartupSection("migration");
     } else if (startup.code === "startup_failed") {
-      setText("startup-error", startup.message || "Unknown startup error");
+      setText("startup-error", translateError(startup.message || "Unknown startup error"));
       showStartupSection("failed");
     } else {
       showStartupSection("loading");
@@ -905,6 +908,8 @@ function openRemoveWallet(address) {
 document.querySelectorAll("[data-view]").forEach((tab) => {
   tab.addEventListener("click", () => activateView(tab.dataset.view));
 });
+
+$("language-toggle").addEventListener("click", toggleLanguage);
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
   button.addEventListener("click", () => closeDialog(button.dataset.closeDialog));
@@ -1060,11 +1065,11 @@ $("prune-form").addEventListener("submit", (event) => {
   const requestedHorizon = Math.max(0, height - retain);
   state.pendingPruneRetain = retain;
   if (currentHorizon > requestedHorizon) {
-    setText("prune-impact", `The ledger is already pruned through block #${currentHorizon.toLocaleString()}. Deleted data will not be restored; future pruning will retain the newest ${retain.toLocaleString()} blocks.`);
+    setText("prune-impact", `The ledger is already pruned through block #${currentHorizon.toLocaleString(currentLocale())}. Deleted data will not be restored; future pruning will retain the newest ${retain.toLocaleString(currentLocale())} blocks.`);
   } else if (requestedHorizon === 0) {
-    setText("prune-impact", `Current height is #${height.toLocaleString()}. No existing body is eligible yet; future pruning will retain the newest ${retain.toLocaleString()} blocks.`);
+    setText("prune-impact", `Current height is #${height.toLocaleString(currentLocale())}. No existing body is eligible yet; future pruning will retain the newest ${retain.toLocaleString(currentLocale())} blocks.`);
   } else {
-    setText("prune-impact", `Block and transaction bodies plus undo records through block #${requestedHorizon.toLocaleString()} will be permanently removed. The newest ${retain.toLocaleString()} blocks remain complete.`);
+    setText("prune-impact", `Block and transaction bodies plus undo records through block #${requestedHorizon.toLocaleString(currentLocale())} will be permanently removed. The newest ${retain.toLocaleString(currentLocale())} blocks remain complete.`);
   }
   openDialog("prune-dialog");
   state.pendingPruneRetain = retain;
@@ -1301,6 +1306,13 @@ async function heartbeat() {
   if (Date.now() - state.lastHistoryRefresh >= 5000) await refreshHistory();
 }
 
+initializeI18n();
+onLanguageChange(() => {
+  if (state.dashboard) renderDashboard(state.dashboard);
+  if (state.history.length > 0) renderHistory(state.history);
+  if (state.updateStatus) renderUpdate(state.updateStatus);
+  updateAllSensitiveCounters();
+});
 createIcons({ icons: appIcons });
 updateAllSensitiveCounters();
 checkStartup();
