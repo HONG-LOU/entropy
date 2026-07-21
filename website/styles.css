@@ -489,12 +489,14 @@ canvas {
   text-transform: uppercase;
 }
 
+.about-band,
 .product-band,
 .economics-band {
   background: var(--paper);
   color: var(--paper-text);
 }
 
+.about-band,
 .product-band,
 .architecture-band,
 .economics-band,
@@ -502,6 +504,84 @@ canvas {
 .infrastructure-band,
 .source-band {
   padding: 104px 0;
+}
+
+.about-band {
+  background: var(--paper-bright);
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 2px solid var(--paper-text);
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.about-grid article {
+  min-height: 250px;
+  padding: 28px 30px 30px 0;
+  border-right: 1px solid var(--paper-line);
+}
+
+.about-grid article + article {
+  padding-left: 30px;
+}
+
+.about-grid article:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.about-grid b {
+  color: var(--mint-dark);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.about-grid h3 {
+  max-width: 270px;
+  margin: 54px 0 12px;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.about-grid p {
+  margin: 0;
+  color: var(--paper-muted);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+.start-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 34px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start-steps li {
+  min-height: 76px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 0 30px 0 18px;
+  border-left: 3px solid var(--mint-dark);
+}
+
+.start-steps span {
+  color: var(--mint-dark);
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.start-steps strong {
+  font-size: 0.82rem;
+  line-height: 1.55;
 }
 
 .section-heading {
@@ -1304,6 +1384,7 @@ canvas {
     border-top: 1px solid var(--line-dark);
   }
 
+  .about-band,
   .product-band,
   .architecture-band,
   .economics-band,
@@ -1332,6 +1413,18 @@ canvas {
 
   .section-heading > p:last-child {
     max-width: 650px;
+  }
+
+  .about-grid article {
+    padding-right: 20px;
+  }
+
+  .about-grid article + article {
+    padding-left: 20px;
+  }
+
+  .start-steps li {
+    padding-right: 20px;
   }
 
   .product-layout,
@@ -1468,6 +1561,33 @@ canvas {
   .infrastructure-layout h2,
   .source-layout h2 {
     font-size: 1.85rem;
+  }
+
+  .about-grid,
+  .start-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .about-grid article,
+  .about-grid article + article,
+  .about-grid article:last-child {
+    min-height: 0;
+    padding: 24px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--paper-line);
+  }
+
+  .about-grid article:last-child {
+    border-bottom: 0;
+  }
+
+  .about-grid h3 {
+    max-width: none;
+    margin-top: 24px;
+  }
+
+  .start-steps {
+    gap: 24px;
   }
 
   .app-window {

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Entcoin — Run the network. Verify everything.</title>
-  <meta name="description" content="Entcoin is a compact proof-of-work network with a local wallet, validating full node, SQLite ledger, peer relay, and optional miner in one desktop application.">
+  <title>Entcoin — Your wallet, your node.</title>
+  <meta name="description" content="Entcoin is an independent proof-of-work network with a local wallet, fully validating node, transaction history, peer connectivity, and optional mining in one desktop application.">
   <meta name="theme-color" content="#0b0f12">
   <link rel="canonical" href="https://entcoin.xyz/">
   <link rel="alternate" hreflang="en" href="https://entcoin.xyz/">
@@ -17,15 +17,15 @@
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Entcoin">
-  <meta property="og:title" content="Entcoin — Run the network. Verify everything.">
-  <meta property="og:description" content="A compact proof-of-work network with local validation and self-custody in one desktop application.">
+  <meta property="og:title" content="Entcoin — Your wallet, your node.">
+  <meta property="og:description" content="An independent proof-of-work network with a local wallet and fully validating node in one desktop application.">
   <meta property="og:url" content="https://entcoin.xyz/">
   <meta property="og:image" content="https://entcoin.xyz/assets/social-preview.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Entcoin — Run the network. Verify everything.">
-  <meta name="twitter:description" content="A compact proof-of-work network with local validation and self-custody in one desktop application.">
+  <meta name="twitter:title" content="Entcoin — Your wallet, your node.">
+  <meta name="twitter:description" content="An independent proof-of-work network with a local wallet and fully validating node in one desktop application.">
   <meta name="twitter:image" content="https://entcoin.xyz/assets/social-preview.png">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Entcoin","applicationCategory":"FinanceApplication","operatingSystem":"Windows 10/11, Ubuntu 24.04+","softwareVersion":"1.0.10","license":"https://opensource.org/licenses/MIT","url":"https://entcoin.xyz/","downloadUrl":"https://github.com/HONG-LOU/entcoin/releases/latest","codeRepository":"https://github.com/HONG-LOU/entcoin","description":"A compact proof-of-work desktop full node with a local wallet, SQLite ledger, peer relay, and optional miner."}</script>
 </head>
@@ -43,7 +43,7 @@
       </a>
 
       <nav class="desktop-nav" aria-label="Primary navigation">
-        <a href="#network" data-i18n="nav.network">Network</a>
+        <a href="#about" data-i18n="nav.about">About</a>
         <a href="#technology" data-i18n="nav.technology">Technology</a>
         <a href="#economics" data-i18n="nav.economics">Economics</a>
         <a href="#download" data-i18n="nav.download">Download</a>
@@ -71,7 +71,7 @@
       </div>
     </div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
-      <a href="#network" data-i18n="nav.network">Network</a>
+      <a href="#about" data-i18n="nav.about">About</a>
       <a href="#technology" data-i18n="nav.technology">Technology</a>
       <a href="#economics" data-i18n="nav.economics">Economics</a>
       <a href="#download" data-i18n="nav.download">Download</a>
@@ -84,8 +84,8 @@
       <div class="hero-inner">
         <div class="hero-copy">
           <p class="eyebrow" data-i18n="hero.eyebrow">Entcoin mainnet / protocol v1</p>
-          <h1 id="hero-title" data-i18n="hero.title">Run the network. Verify everything.</h1>
-          <p class="hero-body" data-i18n="hero.body">A compact proof-of-work network in one desktop application: wallet, validating full node, SQLite ledger, peer relay, and optional miner.</p>
+          <h1 id="hero-title" data-i18n="hero.title">Entcoin. Your wallet, your node.</h1>
+          <p class="hero-body" data-i18n="hero.body">Entcoin is an independent proof-of-work network. Its desktop app gives you a local wallet, a fully validating node, transaction history, peer connectivity, and optional mining without an online account.</p>
           <div class="hero-actions">
             <button class="button button-primary" id="hero-download" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="download-menu">
               <span data-i18n="hero.download">Run a node</span>
@@ -135,10 +135,42 @@
       </div>
     </section>
 
+    <section class="about-band" id="about" aria-labelledby="about-title">
+      <div class="section-inner">
+        <div class="section-heading editorial-heading">
+          <p class="eyebrow" data-i18n="about.eyebrow">01 / Start here</p>
+          <h2 id="about-title" data-i18n="about.title">What is Entcoin?</h2>
+          <p data-i18n="about.body">Entcoin is an open-source cryptocurrency network and ENT is its native unit. People running Entcoin form the network together: they keep their own keys, check the same rules, relay transfers, and may choose to mine new blocks.</p>
+        </div>
+        <div class="about-grid">
+          <article>
+            <b>01</b>
+            <h3 data-i18n="about.wallet.title">A wallet you control</h3>
+            <p data-i18n="about.wallet.body">No registration or hosted account. Your wallet is created on this computer. Back up the 24-word recovery phrase before receiving or mining ENT.</p>
+          </article>
+          <article>
+            <b>02</b>
+            <h3 data-i18n="about.node.title">A real node, not just a wallet screen</h3>
+            <p data-i18n="about.node.body">The app downloads and verifies the chain itself. Two public seed nodes help new installations find the network; they do not decide your balance or approve transactions.</p>
+          </article>
+          <article>
+            <b>03</b>
+            <h3 data-i18n="about.use.title">Transfers and mining in one app</h3>
+            <p data-i18n="about.use.body">Receive and send ENT, inspect confirmations, manage peers, and review diagnostics. Mining is available but remains off until you start it.</p>
+          </article>
+        </div>
+        <ol class="start-steps" aria-label="Getting started" data-i18n-aria-label="about.steps.label">
+          <li><span data-i18n="about.step.download.label">Download</span><strong data-i18n="about.step.download.body">Install the desktop app for your system</strong></li>
+          <li><span data-i18n="about.step.backup.label">Protect</span><strong data-i18n="about.step.backup.body">Create a wallet and record its 24 words</strong></li>
+          <li><span data-i18n="about.step.sync.label">Connect</span><strong data-i18n="about.step.sync.body">Let the node synchronize, then receive, send, or mine</strong></li>
+        </ol>
+      </div>
+    </section>
+
     <section class="product-band" aria-labelledby="product-title">
       <div class="section-inner">
         <div class="section-heading editorial-heading">
-          <p class="eyebrow" data-i18n="product.eyebrow">01 / The node</p>
+          <p class="eyebrow" data-i18n="product.eyebrow">02 / The desktop app</p>
           <h2 id="product-title" data-i18n="product.title">Everything local. Nothing hidden behind an account.</h2>
           <p data-i18n="product.body">Opening Entcoin starts a real validating node. Private keys stay in the local node process, the ledger is stored in SQLite, and every accepted block is checked before state changes.</p>
         </div>
@@ -185,7 +217,7 @@
     <section class="architecture-band" id="technology" aria-labelledby="technology-title">
       <div class="section-inner">
         <div class="section-heading dark-heading">
-          <p class="eyebrow" data-i18n="technology.eyebrow">02 / Verification path</p>
+          <p class="eyebrow" data-i18n="technology.eyebrow">03 / Verification path</p>
           <h2 id="technology-title" data-i18n="technology.title">From peer message to committed ledger.</h2>
           <p data-i18n="technology.body">Headers arrive first. Candidate work is compared locally. Bodies are fetched only for a viable chain, fully validated, and committed atomically with undo data.</p>
         </div>
@@ -202,7 +234,7 @@
     <section class="economics-band" id="economics" aria-labelledby="economics-title">
       <div class="section-inner">
         <div class="section-heading editorial-heading">
-          <p class="eyebrow" data-i18n="economics.eyebrow">03 / Monetary rules</p>
+          <p class="eyebrow" data-i18n="economics.eyebrow">04 / Monetary rules</p>
           <h2 id="economics-title" data-i18n="economics.title">A small, explicit issuance schedule.</h2>
           <p data-i18n="economics.body">No premine, no account balances, and no floating-point supply math. Rewards are determined by block height and sum to an exact terminal amount.</p>
         </div>
@@ -228,7 +260,7 @@
     <section class="download-band" id="download" aria-labelledby="download-title">
       <div class="section-inner">
         <div class="section-heading dark-heading">
-          <p class="eyebrow" data-i18n="download.eyebrow">04 / Join</p>
+          <p class="eyebrow" data-i18n="download.eyebrow">05 / Join</p>
           <h2 id="download-title" data-i18n="download.title">Choose your node.</h2>
           <p data-i18n="download.body">Desktop builds include the wallet and operational interface. The headless CLI runs the same validation, ledger, and peer-to-peer implementation.</p>
         </div>
@@ -262,7 +294,7 @@
     <section class="infrastructure-band" aria-labelledby="infrastructure-title">
       <div class="section-inner infrastructure-layout">
         <div>
-          <p class="eyebrow" data-i18n="infrastructure.eyebrow">05 / Live infrastructure</p>
+          <p class="eyebrow" data-i18n="infrastructure.eyebrow">06 / Live infrastructure</p>
           <h2 id="infrastructure-title" data-i18n="infrastructure.title">Inspect the public node.</h2>
           <p data-i18n="infrastructure.body">This page reads the same bounded status endpoint other nodes use. No market ticker and no fabricated activity.</p>
           <a class="text-link" href="https://node.entcoin.xyz/v2/status" target="_blank" rel="noreferrer"><span data-i18n="infrastructure.endpoint">Open status endpoint</span><span aria-hidden="true">↗</span></a>
@@ -284,7 +316,7 @@
       <div class="section-inner source-layout">
         <div class="source-mark" aria-hidden="true"><img src="/assets/appicon.png" width="96" height="96" alt=""><span>MIT</span></div>
         <div>
-          <p class="eyebrow" data-i18n="source.eyebrow">06 / Open source</p>
+          <p class="eyebrow" data-i18n="source.eyebrow">07 / Open source</p>
           <h2 id="source-title" data-i18n="source.title">The implementation is the claim.</h2>
           <p data-i18n="source.body">Entcoin is MIT-licensed. Consensus, wallet, ledger, networking, tests, operations, and known limitations are public in the repository.</p>
           <div class="source-links">

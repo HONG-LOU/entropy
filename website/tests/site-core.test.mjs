@@ -106,7 +106,7 @@ test("homepage translation keys are all defined", async () => {
 
   assert.ok(keys.length >= 70);
   assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
-  for (const id of ["main", "network", "technology", "economics", "download", "open-source", "security"]) {
+  for (const id of ["main", "network", "about", "technology", "economics", "download", "open-source", "security"]) {
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
   assert.match(html, /class="skip-link"/);
@@ -187,6 +187,7 @@ test("browser module wires language, live data, menus, and motion preferences", 
     'from "./site-core.mjs"',
     '"entcoin-language"',
     'searchParams.get("lang")',
+    'navigator.language.toLowerCase().startsWith("zh")',
     'fetchWithTimeout("/api/network-status"',
     'matchMedia("(prefers-reduced-motion: reduce)")',
     'addEventListener("visibilitychange"',

@@ -27,10 +27,12 @@ function initialLanguage() {
   const requested = new URL(window.location.href).searchParams.get("lang");
   if (requested === "zh" || requested === "en") return requested;
   try {
-    return window.localStorage.getItem(LANGUAGE_KEY) === "zh" ? "zh" : "en";
+    const saved = window.localStorage.getItem(LANGUAGE_KEY);
+    if (saved === "zh" || saved === "en") return saved;
   } catch {
-    return "en";
+    // Fall through to the browser language when storage is blocked.
   }
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
 function setLanguage(nextLanguage, { updateUrl = true } = {}) {
