@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	CurrentVersion          = "1.0.15"
+	CurrentVersion          = "1.1.0"
 	ReleasesURL             = "https://github.com/HONG-LOU/entcoin/releases/latest"
 	releaseFeedURL          = "https://github.com/HONG-LOU/entcoin/releases.atom"
 	updateManifestURL       = "https://entcoin.xyz/update.json"
@@ -230,12 +230,10 @@ func (c *Client) selectRelease(latestVersion, releaseURL, publishedAt string) (r
 	}
 	artifactURLs = append(artifactURLs, githubBase+artifactName)
 	artifact := releaseAsset{Name: artifactName, URLs: artifactURLs}
-	checksumURLs := make([]string, 0, len(c.mirrorBases)+1)
-	for _, base := range c.mirrorBases {
-		checksumURLs = append(checksumURLs, base+"v"+latestVersion+"/"+checksumName)
-	}
-	checksumURLs = append(checksumURLs, githubBase+checksumName)
-	checksum := releaseAsset{Name: checksumName, URLs: checksumURLs}
+	// Mirrors distribute bytes but are not update trust roots. Fetching both an
+	// artifact and its checksum from one mirror would let a compromised mirror
+	// replace both and pass verification.
+	checksum := releaseAsset{Name: checksumName, URLs: []string{githubBase + checksumName}}
 	status.AssetName = artifactName
 	return releaseSelection{status: status, artifact: artifact, checksum: checksum}, nil
 }

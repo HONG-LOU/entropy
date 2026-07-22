@@ -1,0 +1,23 @@
+# Entcoin documentation
+
+[English](../README.md) | [简体中文](../README.zh-CN.md)
+
+Entcoin documentation separates protocol facts from operating procedures and
+security claims. Code and consensus tests remain authoritative where prose and
+implementation disagree.
+
+| Document | Purpose |
+| --- | --- |
+| [Architecture](architecture.md) | Components, validation flow, persistence, wallet, sync, and trust boundaries |
+| [Protocol](protocol.md) | Consensus objects, deterministic encoding, HTTP/WebSocket protocol, and limits |
+| [Operations](operations.md) | Installation, node operation, backup, recovery, pruning, and troubleshooting |
+| [Public seed](public-seed.md) | Hardened archive seed deployment and proxy boundary |
+| [v1.1.0 security audit](security-audit-v1.1.0.md) | Audit scope, findings, mathematical checks, evidence, and residual risk |
+| [Security policy](../SECURITY.md) | Supported versions, reporting, disclosure, and user guidance |
+| [Roadmap](next-step.md) | Explicitly unfinished production-readiness work |
+| [Release notes](../RELEASE_NOTES.md) | Complete v1.1.0 release log and upgrade notes |
+
+## 文档导航
+
+中文用户可从[简体中文 README](../README.zh-CN.md)开始。共识参数、安装命令、
+备份恢复、安全边界和发布验证均在该入口中给出；更细的规范以本目录英文技术文档为准。

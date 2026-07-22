@@ -1,7 +1,7 @@
 {
   "name": "entcoin-desktop",
   "private": true,
-  "version": "1.0.15",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,5 +14,8 @@
   },
   "devDependencies": {
     "vite": "^6.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }

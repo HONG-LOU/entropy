@@ -27,12 +27,17 @@ command -v dpkg-deb >/dev/null || { echo "dpkg-deb is required" >&2; exit 1; }
 
 cd "$project"
 wails build -clean -trimpath -platform linux/amd64 -tags webkit2_41 -o entcoin-linux-amd64
-go build -trimpath -o "$bin/entcoin-cli-linux-amd64" ./cmd/entcoin
+go build -trimpath -ldflags="-s -w" -o "$bin/entcoin-cli-linux-amd64" ./cmd/entcoin
 
-install -d \
+install -d -m 0755 \
     "$stage/DEBIAN" \
+    "$stage/usr" \
     "$stage/usr/bin" \
+    "$stage/usr/share" \
     "$stage/usr/share/applications" \
+    "$stage/usr/share/icons" \
+    "$stage/usr/share/icons/hicolor" \
+    "$stage/usr/share/icons/hicolor/512x512" \
     "$stage/usr/share/icons/hicolor/512x512/apps"
 install -m 0755 "$bin/entcoin-linux-amd64" "$stage/usr/bin/entcoin"
 install -m 0755 "$bin/entcoin-cli-linux-amd64" "$stage/usr/bin/entcoin-cli"
@@ -45,6 +50,11 @@ sed \
     -e "s/@VERSION@/$version/g" \
     -e "s/@INSTALLED_SIZE@/$installed_size/g" \
     "$project/deploy/linux-desktop/control" > "$stage/DEBIAN/control"
+
+if unsafe_directory=$(find "$stage" -type d -perm /022 -print -quit) && [[ -n $unsafe_directory ]]; then
+    echo "package directory is group/other writable: $unsafe_directory" >&2
+    exit 1
+fi
 
 package="$bin/entcoin_${version}_amd64.deb"
 dpkg-deb --build --root-owner-group "$stage" "$package"

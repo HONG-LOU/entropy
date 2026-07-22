@@ -1,4 +1,4 @@
-export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.15";
+export const FALLBACK_RELEASE_URL = "https://github.com/HONG-LOU/entcoin/releases/tag/v1.1.0";
 
 const en = {
   "meta.title": "Entcoin — Your wallet, your node.",
@@ -105,7 +105,7 @@ const en = {
   "download.cli.action": "CLI downloads",
   "download.checksums": "Checksums",
   "download.release": "View release notes",
-  "download.boundary": "v1.0.15 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
+  "download.boundary": "v1.1.0 is unsigned and may trigger SmartScreen. Verify the published checksums and understand their limits.",
   "infrastructure.eyebrow": "06 / Live infrastructure",
   "infrastructure.title": "Inspect the public node.",
   "infrastructure.body": "This page reads the same bounded status endpoint other nodes use. No market ticker and no fabricated activity.",
@@ -247,7 +247,7 @@ const zh = {
   "download.cli.action": "选择命令行版本",
   "download.checksums": "核对文件完整性",
   "download.release": "查看版本说明",
-  "download.boundary": "v1.0.15 暂未购买代码签名证书，Windows 可能显示“未知发布者”或 SmartScreen 提醒。请只从本官网或官方 GitHub 下载，并核对 SHA-256。",
+  "download.boundary": "v1.1.0 暂未购买代码签名证书，Windows 可能显示“未知发布者”或 SmartScreen 提醒。请只从本官网或官方 GitHub 下载，并核对 SHA-256。",
   "infrastructure.eyebrow": "06 / 网络现状",
   "infrastructure.title": "公共节点现在是否在线？",
   "infrastructure.body": "这里直接读取公共节点的实时状态，显示它当前同步到的区块高度和最新区块摘要。公共节点用于帮助其他节点联网和同步，不托管用户钱包。",
@@ -326,7 +326,7 @@ export function selectReleaseAssets(value) {
   if (!isStableRelease(value)) return fallback;
 
   const prefix = `/HONG-LOU/entcoin/releases/download/${value.tag_name}/`;
-  const known = new Set();
+  const known = new Map();
   for (const asset of Array.isArray(value.assets) ? value.assets : []) {
     if (!asset || typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") continue;
     let url;
@@ -336,7 +336,7 @@ export function selectReleaseAssets(value) {
       continue;
     }
     if (url.protocol !== "https:" || url.hostname !== "github.com" || !url.pathname.startsWith(prefix)) continue;
-    known.add(asset.name);
+    known.set(asset.name, asset.browser_download_url);
   }
 
   return {
@@ -347,14 +347,14 @@ export function selectReleaseAssets(value) {
     ubuntu: findMirrorAsset(known, /^entcoin_\d+\.\d+\.\d+_amd64\.deb$/i, value.tag_name) ?? fallback.release,
     linuxCli: findMirrorAsset(known, /^entcoin-cli-linux-amd64$/i, value.tag_name) ?? fallback.release,
     windowsCli: findMirrorAsset(known, /^entcoin-cli\.exe$/i, value.tag_name) ?? fallback.release,
-    linuxChecksums: findMirrorAsset(known, /^SHA256SUMS-linux\.txt$/i, value.tag_name) ?? fallback.release,
-    windowsChecksums: findMirrorAsset(known, /^SHA256SUMS\.txt$/i, value.tag_name) ?? fallback.release,
+    linuxChecksums: findGitHubAsset(known, /^SHA256SUMS-linux\.txt$/i) ?? fallback.release,
+    windowsChecksums: findGitHubAsset(known, /^SHA256SUMS\.txt$/i) ?? fallback.release,
   };
 }
 
 function isStableRelease(value) {
   if (!value || typeof value !== "object" || value.draft || value.prerelease) return false;
-  if (typeof value.tag_name !== "string" || !/^v1\.0\.\d+$/.test(value.tag_name)) return false;
+  if (typeof value.tag_name !== "string" || !/^v\d+\.\d+\.\d+$/.test(value.tag_name)) return false;
   if (typeof value.html_url !== "string") return false;
   try {
     const url = new URL(value.html_url);
@@ -366,15 +366,22 @@ function isStableRelease(value) {
 }
 
 function findMirrorAsset(assets, pattern, version) {
-  for (const name of assets) {
+  for (const name of assets.keys()) {
     if (pattern.test(name)) return `https://template-chat.xyz/downloads/${version}/${encodeURIComponent(name)}`;
+  }
+  return undefined;
+}
+
+function findGitHubAsset(assets, pattern) {
+  for (const [name, address] of assets) {
+    if (pattern.test(name)) return address;
   }
   return undefined;
 }
 
 function fallbackRelease() {
   return {
-    version: "v1.0.15",
+    version: "v1.1.0",
     release: FALLBACK_RELEASE_URL,
     windowsPortable: FALLBACK_RELEASE_URL,
     windowsInstaller: FALLBACK_RELEASE_URL,

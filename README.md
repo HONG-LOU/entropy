@@ -1,6 +1,22 @@
-# Entcoin (ENT)
+<p align="center">
+  <img src="build/appicon.png" width="112" alt="Entcoin logo">
+</p>
 
-Entcoin v1.0.15 is a compact proof-of-work mainnet packaged as a Windows and
+<h1 align="center">Entcoin</h1>
+
+<p align="center">
+  A compact proof-of-work full node, local wallet, and miner for Windows and Ubuntu.
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="https://github.com/HONG-LOU/entcoin/releases/latest">Download</a> ·
+  <a href="SECURITY.md">Security</a> · <a href="docs/README.md">Documentation</a>
+</p>
+
+---
+
+Entcoin v1.1.0 is a compact proof-of-work mainnet packaged as a Windows and
 Ubuntu desktop full node. Starting one application starts the wallet, SQLite
 ledger, full block and transaction validation, peer synchronization, relay
 server, and optional miner in the same process. It does not require a separate
@@ -12,7 +28,7 @@ database server, browser tab, or background daemon.
 The source repository is public and MIT-licensed:
 <https://github.com/HONG-LOU/entcoin>.
 
-## What v1.0.15 includes
+## What v1.1.0 includes
 
 - A Wails desktop node with send, receive, automatic minimum fees, mining,
   network health, history, wallet recovery, database, and pruning controls.
@@ -45,9 +61,9 @@ The source repository is public and MIT-licensed:
 - Windows portable/NSIS artifacts, an Ubuntu 24.04+ `.deb`, native headless
   CLIs, and an optional Windows archive-seed deployment package.
 - A desktop updater that checks `entcoin.xyz` with a GitHub metadata fallback,
-  downloads the matching installer and checksum manifest from the Alibaba
-  Cloud Asia mirror, then the US website mirror or GitHub, with resume support,
-  verifies SHA-256, installs it, closes the old process, and relaunches Entcoin.
+  downloads the matching installer from the Alibaba Cloud Asia mirror, US
+  website mirror, or GitHub, verifies it against the checksum obtained only
+  from the official GitHub Release, installs it, and relaunches Entcoin.
 
 ## How many nodes are required?
 
@@ -77,7 +93,7 @@ The NSIS build is the `*installer*.exe` artifact in the same directory. The
 installer is the simplest distribution for other Windows users; the portable
 EXE can be launched directly. Windows 10/11 x64 and Microsoft WebView2 Runtime
 are required. The installer build downloads the WebView2 bootstrapper when
-needed. The current v1.0.15 release is unsigned, so Windows SmartScreen may show
+needed. The current v1.1.0 release is unsigned, so Windows SmartScreen may show
 an unknown-publisher warning. The build signs and timestamps the portable
 application, installer, and CLI before checksums are generated when a trusted
 Authenticode certificate is configured.
@@ -132,7 +148,7 @@ setup, backups, migration, pruning, and troubleshooting.
 Ubuntu 24.04+ amd64 users install the `.deb` from the current release:
 
 ```bash
-sudo apt install ./entcoin_1.0.15_amd64.deb
+sudo apt install ./entcoin_1.1.0_amd64.deb
 entcoin
 ```
 
@@ -150,10 +166,10 @@ mining, and peer synchronization are identical on both platforms.
 
 The **Diagnostics** view can check for a newer stable release and install the
 correct package for the current platform. Entcoin fetches the versioned
-checksum manifest and installer from `entcoin.xyz` first, with bounded GitHub
-fallbacks, and requires the artifact to match SHA-256. An interrupted partial
-file resumes on the next attempt. After verification, Entcoin installs it,
-closes the old process, and relaunches the new version.
+checksum manifest only from the official GitHub Release, then tries the bounded
+artifact mirrors and GitHub until bytes match that SHA-256. An interrupted
+partial file resumes on the next attempt. After verification, Entcoin installs
+it, closes the old process, and relaunches the new version.
 Ubuntu shows the normal Polkit authorization prompt. Unsigned Windows
 installers may still show the normal SmartScreen warning; the updater does not
 bypass either trust boundary.
@@ -303,7 +319,7 @@ outside `%LOCALAPPDATA%\Entropy\mainnet-v1`.
 
 Wallet keys are separate from chain history. Before leaving the testnet app,
 record its 24-word recovery phrase or export and verify an encrypted
-`.entwallet` backup. Start v1.0.15 to create the mainnet directory, then use the
+`.entwallet` backup. Start v1.1.0 to create the mainnet directory, then use the
 desktop Wallet view to restore that phrase or backup. The address is recovered,
 while balances and history are rebuilt only from the mainnet chain.
 
@@ -345,7 +361,7 @@ reproducible.
 On Ubuntu 24.04:
 
 ```bash
-./scripts/build-linux.sh 1.0.15
+./scripts/build-linux.sh 1.1.0
 ```
 
 ## Documentation

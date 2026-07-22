@@ -58,14 +58,14 @@ test("formatted status groups height and shortens the hash", () => {
 
 test("release selection accepts only known stable release assets", () => {
   const selected = selectReleaseAssets({
-    tag_name: "v1.0.15",
-    html_url: "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.15",
+    tag_name: "v1.1.0",
+    html_url: "https://github.com/HONG-LOU/entcoin/releases/tag/v1.1.0",
     draft: false,
     prerelease: false,
     assets: [
       asset("Entcoin.exe"),
       asset("entcoin-amd64-installer.exe"),
-      asset("entcoin_1.0.15_amd64.deb"),
+      asset("entcoin_1.1.0_amd64.deb"),
       asset("entcoin-cli-linux-amd64"),
       asset("entcoin-cli.exe"),
       asset("SHA256SUMS-linux.txt"),
@@ -74,23 +74,31 @@ test("release selection accepts only known stable release assets", () => {
     ],
   });
 
-  assert.equal(selected.version, "v1.0.15");
+  assert.equal(selected.version, "v1.1.0");
   assert.match(selected.windowsPortable, /Entcoin\.exe$/);
   assert.match(selected.windowsInstaller, /entcoin-amd64-installer\.exe$/);
-  assert.match(selected.ubuntu, /entcoin_1\.0\.15_amd64\.deb$/);
+  assert.match(selected.ubuntu, /entcoin_1\.1\.0_amd64\.deb$/);
   assert.match(selected.linuxCli, /entcoin-cli-linux-amd64$/);
   assert.match(selected.windowsCli, /entcoin-cli\.exe$/);
   for (const address of [selected.windowsPortable, selected.windowsInstaller, selected.ubuntu, selected.linuxCli, selected.windowsCli]) {
-    assert.match(address, /^https:\/\/template-chat\.xyz\/downloads\/v1\.0\.15\//);
+    assert.match(address, /^https:\/\/template-chat\.xyz\/downloads\/v1\.1\.0\//);
   }
-  assert.equal(selected.release, "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.15");
+  assert.equal(
+    selected.windowsChecksums,
+    "https://github.com/HONG-LOU/entcoin/releases/download/v1.1.0/SHA256SUMS.txt",
+  );
+  assert.equal(
+    selected.linuxChecksums,
+    "https://github.com/HONG-LOU/entcoin/releases/download/v1.1.0/SHA256SUMS-linux.txt",
+  );
+  assert.equal(selected.release, "https://github.com/HONG-LOU/entcoin/releases/tag/v1.1.0");
 });
 
 test("release selection falls back for drafts, prereleases, and foreign URLs", () => {
-  const draft = selectReleaseAssets({ tag_name: "v1.0.15", draft: true, prerelease: false, assets: [] });
+  const draft = selectReleaseAssets({ tag_name: "v1.1.0", draft: true, prerelease: false, assets: [] });
   const prerelease = selectReleaseAssets({ tag_name: "v1.0.3-rc1", draft: false, prerelease: true, assets: [] });
   const foreign = selectReleaseAssets({
-    tag_name: "v1.0.15",
+    tag_name: "v1.1.0",
     html_url: "https://evil.example/release",
     draft: false,
     prerelease: false,
@@ -119,13 +127,16 @@ test("homepage translation keys are all defined", async () => {
   for (const assetName of [
     "entcoin-amd64-installer.exe",
     "Entcoin.exe",
-    "entcoin_1.0.15_amd64.deb",
+    "entcoin_1.1.0_amd64.deb",
     "entcoin-cli-linux-amd64",
     "entcoin-cli.exe",
-    "SHA256SUMS.txt",
   ]) {
-    assert.ok(html.includes(`/downloads/v1.0.15/${assetName}`), assetName);
+    assert.ok(html.includes(`/downloads/v1.1.0/${assetName}`), assetName);
   }
+  assert.ok(
+    html.includes("https://github.com/HONG-LOU/entcoin/releases/download/v1.1.0/SHA256SUMS.txt"),
+    "GitHub checksum source",
+  );
   for (const key of keys) {
     assert.ok(translations.en[key], `missing English translation: ${key}`);
     assert.ok(translations.zh[key], `missing Chinese translation: ${key}`);
@@ -138,9 +149,9 @@ test("homepage translation keys are all defined", async () => {
 test("desktop update fallback names the current official release", async () => {
   const manifest = JSON.parse(await readFile(new URL("../update.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest, {
-    version: "1.0.15",
-    published_at: "2026-07-21T00:00:00Z",
-    release_url: "https://github.com/HONG-LOU/entcoin/releases/tag/v1.0.15",
+    version: "1.1.0",
+    published_at: "2026-07-22T00:00:00Z",
+    release_url: "https://github.com/HONG-LOU/entcoin/releases/tag/v1.1.0",
   });
 });
 
@@ -225,6 +236,6 @@ test("production nginx host isolates the website and read-only status proxy", as
 function asset(name) {
   return {
     name,
-    browser_download_url: `https://github.com/HONG-LOU/entcoin/releases/download/v1.0.15/${name}`,
+    browser_download_url: `https://github.com/HONG-LOU/entcoin/releases/download/v1.1.0/${name}`,
   };
 }

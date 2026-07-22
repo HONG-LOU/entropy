@@ -5,6 +5,48 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-22
+
+### Added
+
+- Added complete English and Simplified Chinese README entry points, a
+  documentation index, controlled release notes, and a project-led v1.1.0
+  security audit with mathematical checks, evidence, and residual risks.
+- Added immutable GitHub build-provenance attestations for published release
+  artifacts.
+
+### Security
+
+- Removed the Alibaba Cloud and website mirrors from the update checksum trust
+  path. Artifacts may still use either mirror, but the expected SHA-256 now
+  comes only from the official GitHub Release.
+- Added an adversarial updater regression test proving that an artifact and
+  matching checksum supplied by a compromised mirror are not trusted.
+- Upgraded `golang.org/x/crypto` to v0.52.0 and `golang.org/x/sys` to v0.45.0;
+  reachable-code vulnerability scanning reports zero vulnerabilities.
+- Pinned all GitHub Actions to immutable commit SHAs, reduced release workflow
+  permissions, and added Go race, `govulncheck`, and npm audit CI gates.
+- Fixed Linux package directories to explicit non-writable `0755` modes instead
+  of inheriting the build host's umask, and added a pre-package permission gate.
+
+### Changed
+
+- Unified desktop, updater, package, website, build, operations, architecture,
+  protocol, and security metadata on v1.1.0.
+- Changed GitHub Release publishing to use the reviewed `RELEASE_NOTES.md`
+  instead of a generic fixed warning as the release body.
+- Added a tag-aware release metadata verifier and stripped unnecessary debug
+  symbols from release CLI binaries.
+- Preserved `entropy-mainnet-v1`, its genesis, consensus parameters, wallet
+  derivation, address format, database schema, and P2P compatibility. No chain
+  reset or wallet migration is required.
+
+### Verification
+
+- Passed the full Go test suite, race detector, `go vet`, CLI build, frontend
+  and website tests, production frontend build, npm audit, and `govulncheck`
+  with Go 1.26.5.
+
 ## [1.0.15] - 2026-07-21
 
 ### Changed

@@ -14,10 +14,10 @@
 - Establish miner and operator diversity, reorganization and hash-rate alerts,
   public incident channels, and a versioned emergency upgrade, rollback, and
   governance process.
-- Make release artifacts independently verifiable: reproducible builds where
-  practical, signed checksums, detached signatures, provenance, an SBOM,
-  Windows Authenticode, Linux package signing, and documented release-key
-  rotation and compromise response.
+- Extend the v1.1.0 GitHub build provenance with reproducible-build evidence,
+  signed checksums, detached project signatures, an SBOM, mandatory Windows
+  Authenticode, Linux package signing, and documented release-key rotation and
+  compromise response.
 - Operate at least three archive seeds across independent operators, providers,
   and jurisdictions. Add external health monitoring, sustained-load evidence,
   signed and versioned bootstrap data, and a DNS-based fallback.
@@ -43,8 +43,9 @@
   growth forecasts, and multi-region seed monitoring.
 - Validate schema migration, pruning, bootstrap, and archive serving against
   projected multi-year chain growth and realistic public traffic.
-- Add CI coverage for race detection, sustained fuzzing, dependency and source
-  vulnerability scanning, frontend checks, and multi-node network scenarios.
+- Extend the existing race, reachable-vulnerability, npm audit, frontend, and
+  multi-node CI gates with sustained fuzzing, source scanning, hostile traffic,
+  and long-lived network scenarios.
 
 ## P2: optional ecosystem work
 

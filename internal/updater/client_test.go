@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const testReleaseVersion = "1.0.16"
+const testReleaseVersion = "1.1.1"
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -42,11 +42,12 @@ func TestCompareVersions(t *testing.T) {
 func TestLatestStableEntryIgnoresPrereleasesAndSelectsHighestVersion(t *testing.T) {
 	entries := []atomEntry{
 		{Title: "v1.0.7"},
-		{Title: "v1.0.16-rc1"},
+		{Title: "v1.1.1-rc1"},
 		{Title: "v1.0.9"},
 		{Title: "v1.0.10"},
 		{Title: "v1.0.15"},
 		{Title: "v1.0.16"},
+		{Title: "v1.1.1"},
 	}
 
 	entry, version, err := latestStableEntry(entries)
@@ -186,7 +187,8 @@ func TestNewPrefersAsianMirror(t *testing.T) {
 	if len(selection.artifact.URLs) != 3 || !strings.HasPrefix(selection.artifact.URLs[0], wantPrefix) {
 		t.Fatalf("artifact sources = %v", selection.artifact.URLs)
 	}
-	if len(selection.checksum.URLs) != 3 || !strings.HasPrefix(selection.checksum.URLs[0], wantPrefix) {
+	githubChecksum := "https://github.com/HONG-LOU/entcoin/releases/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
+	if len(selection.checksum.URLs) != 1 || selection.checksum.URLs[0] != githubChecksum {
 		t.Fatalf("checksum sources = %v", selection.checksum.URLs)
 	}
 }
@@ -222,7 +224,7 @@ func TestCheckFallsBackToGitHubFeed(t *testing.T) {
 	}
 }
 
-func TestPrepareLatestUsesMirrorChecksumWithoutGitHub(t *testing.T) {
+func TestPrepareLatestUsesOnlyGitHubChecksum(t *testing.T) {
 	artifact := []byte("verified deb payload")
 	client, server, state := testClient(t, artifact, false)
 	defer server.Close()
@@ -234,32 +236,36 @@ func TestPrepareLatestUsesMirrorChecksumWithoutGitHub(t *testing.T) {
 	mirrorChecksum := "/mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
 	githubChecksum := "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
 	requests := state.requestPaths()
-	if !containsString(requests, mirrorChecksum) || containsString(requests, githubChecksum) {
+	if containsString(requests, mirrorChecksum) || !containsString(requests, githubChecksum) {
 		t.Fatalf("checksum requests = %v", requests)
 	}
 }
 
-func TestPrepareLatestFallsBackFromInvalidMirrorChecksum(t *testing.T) {
-	artifact := []byte("verified deb payload")
-	client, server, state := testClient(t, artifact, false)
+func TestPrepareLatestRejectsCompromisedMirrorChecksum(t *testing.T) {
+	trustedArtifact := []byte("verified deb payload")
+	client, server, state := testClient(t, trustedArtifact, false)
 	defer server.Close()
-	client.mirrorBases = []string{server.URL + "/bad-checksum/"}
+	client.mirrorBases = []string{server.URL + "/compromised-mirror/"}
 
-	if _, err := client.PrepareLatest(context.Background(), nil); err != nil {
+	prepared, err := client.PrepareLatest(context.Background(), nil)
+	if err != nil {
 		t.Fatal(err)
 	}
+	data, err := os.ReadFile(prepared.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, trustedArtifact) {
+		t.Fatalf("installed artifact = %q", data)
+	}
 	requests := state.requestPaths()
-	for _, prefix := range []string{"/bad-checksum/", "/download/"} {
-		found := false
-		for _, requestPath := range requests {
-			if strings.HasPrefix(requestPath, prefix) && strings.HasSuffix(requestPath, "SHA256SUMS-linux.txt") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("checksum requests = %v", requests)
-		}
+	compromisedChecksum := "/compromised-mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
+	if containsString(requests, compromisedChecksum) {
+		t.Fatalf("compromised mirror was trusted for checksums: %v", requests)
+	}
+	paths, _ := state.artifactRequests()
+	if len(paths) < 2 || !strings.HasPrefix(paths[0], "/compromised-mirror/") || !strings.HasPrefix(paths[1], "/download/") {
+		t.Fatalf("artifact fallback order = %v", paths)
 	}
 }
 
@@ -488,12 +494,15 @@ func testClient(t *testing.T, artifact []byte, mismatch bool) (*Client, *httptes
 			_, _ = response.Write(artifact)
 		case "/bad-mirror/v" + testReleaseVersion + "/" + artifactName:
 			_, _ = response.Write(bytes.Repeat([]byte("x"), len(artifact)))
+		case "/compromised-mirror/v" + testReleaseVersion + "/" + artifactName:
+			_, _ = response.Write([]byte("malicious payload"))
 		case "/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		case "/mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
-		case "/bad-checksum/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
-			_, _ = response.Write([]byte("not a checksum\n"))
+		case "/compromised-mirror/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
+			malicious := sha256.Sum256([]byte("malicious payload"))
+			_, _ = response.Write([]byte(hex.EncodeToString(malicious[:]) + "  " + artifactName + "\n"))
 		case "/no-range/v" + testReleaseVersion + "/SHA256SUMS-linux.txt":
 			_, _ = response.Write([]byte(checksumText + "  " + artifactName + "\n"))
 		default:

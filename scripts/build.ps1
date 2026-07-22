@@ -32,7 +32,7 @@ try {
     $portable = Join-Path $bin "Entcoin.exe"
     $installer = Join-Path $bin "entcoin-amd64-installer.exe"
     $cli = Join-Path $bin "entcoin-cli.exe"
-    go build -trimpath -o $cli .\cmd\entcoin
+    go build -trimpath -ldflags "-s -w" -o $cli .\cmd\entcoin
     if ($LASTEXITCODE -ne 0) { throw "CLI build failed with exit code $LASTEXITCODE" }
 
     $signingCertificate = $env:ENTCOIN_WINDOWS_CERTIFICATE_BASE64

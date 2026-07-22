@@ -5,25 +5,29 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows-build:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.26.5"
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify release metadata
+        shell: pwsh
+        run: node scripts/verify-release.mjs $env:GITHUB_REF_NAME
 
       - name: Install pinned packaging tools
         shell: pwsh
@@ -39,7 +43,7 @@ jobs:
           ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD }}
           ENTCOIN_WINDOWS_TIMESTAMP_URL: ${{ vars.ENTCOIN_WINDOWS_TIMESTAMP_URL }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: entcoin-windows-amd64
           if-no-files-found: error
@@ -54,18 +58,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.26.5"
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify release metadata
+        run: node scripts/verify-release.mjs "$GITHUB_REF_NAME"
 
       - name: Install pinned Linux packaging tools
         run: |
@@ -86,7 +93,7 @@ jobs:
           sudo apt-get install -y ./build/bin/entcoin_*_amd64.deb
           dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entcoin-cli /tmp/entcoin-wallet-smoke
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: entcoin-linux-amd64
           if-no-files-found: error
@@ -99,17 +106,26 @@ jobs:
   publish:
     needs: [windows-build, linux-build]
     runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: entcoin-*-amd64
           path: release-assets
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          body: |
-            Windows artifacts in ${{ github.ref_name }} are not Authenticode-signed and may trigger Microsoft Defender SmartScreen. Verify the published SHA-256 checksums before use.
+          subject-path: release-assets/*
+
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-assets/*

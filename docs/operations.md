@@ -1,6 +1,6 @@
 # Entcoin node operations
 
-This guide covers the v1.0.15 Windows/Ubuntu desktop node, headless CLI, and
+This guide covers the v1.1.0 Windows/Ubuntu desktop node, headless CLI, and
 optional public-seed deployment. The network identity is
 `entropy-mainnet-v1`; this compatibility label keeps existing Entcoin nodes,
 wallets, and chain data on the same network.
@@ -16,14 +16,14 @@ Release builds provide these Windows artifacts:
 
 Ubuntu 24.04+ amd64 releases additionally provide:
 
-- `entcoin_1.0.15_amd64.deb`: desktop application and CLI installer;
+- `entcoin_1.1.0_amd64.deb`: desktop application and CLI installer;
 - `entcoin-linux-amd64`: unpackaged desktop binary;
 - `entcoin-cli-linux-amd64`: unpackaged headless node;
 - `SHA256SUMS-linux.txt`: Linux artifact checksums.
 
 Verify Windows artifacts against `SHA256SUMS.txt` and Linux artifacts against
 `SHA256SUMS-linux.txt` from the same release before running them. Current
-v1.0.15 binaries are not code-signed, so a checksum proves only that the file matches
+v1.1.0 binaries are not code-signed, so a checksum proves only that the file matches
 the published release artifact, not that a trusted certificate authority
 verified its publisher.
 
@@ -48,7 +48,7 @@ strict `--listen` behavior so operator mistakes fail visibly.
 Microsoft WebView2 Runtime is required. It is normally present on current
 Windows 10/11 systems; the NSIS build can install the bootstrapper when needed.
 
-Install Ubuntu packages with `sudo apt install ./entcoin_1.0.15_amd64.deb`, then
+Install Ubuntu packages with `sudo apt install ./entcoin_1.1.0_amd64.deb`, then
 launch **Entcoin** from the desktop menu or run `entcoin`. Ubuntu stores mainnet
 state under `~/.config/Entcoin/mainnet-v1`. The logged-in desktop session must
 provide an unlocked Secret Service keyring; the standard Ubuntu Desktop session
@@ -59,13 +59,13 @@ does so automatically.
 Open **Diagnostics → Software update** to check the bounded
 `https://entcoin.xyz/update.json` manifest first and the official stable GitHub
 Release feed on failure. Entcoin selects the platform installer, limits
-metadata and download sizes, and gives each metadata or checksum source a
-bounded timeout. The checksum manifest and installer come from exact versioned
-Alibaba Cloud and US website mirror URLs before matching GitHub Release URLs;
-invalid checksum content also advances to the next source. Interrupted files
-resume from the protected update cache with HTTP Range requests; a server that
-does not honor Range causes a safe restart from byte zero. The exact asset must
-still match `SHA256SUMS.txt` or `SHA256SUMS-linux.txt`. **Update and restart**
+metadata and download sizes, and gives metadata and checksum requests a bounded
+timeout. The checksum manifest comes only from the matching official GitHub
+Release. Installers may then come from exact versioned Alibaba Cloud and US
+website mirror URLs or GitHub, but they are accepted only when their bytes match
+that GitHub digest. Interrupted files resume from the protected update cache
+with HTTP Range requests; a server that does not honor Range causes a safe
+restart from byte zero. **Update and restart**
 installs the verified package, closes the old process, and relaunches Entcoin.
 Ubuntu requests normal Polkit authorization. Windows uses the per-user NSIS
 installer and may show SmartScreen. The updater does not bypass either
@@ -74,9 +74,10 @@ operating-system trust prompt.
 The first release mirror is the Alibaba Cloud endpoint at
 `https://template-chat.xyz/downloads/`, followed by
 `https://entcoin.xyz/downloads/` and the matching GitHub Release. Both mirrors
-serve immutable version directories with byte-range support. Mirror operators
-must stage a complete release, validate `SHA256SUMS.txt` and
-`SHA256SUMS-linux.txt`, and only then publish the version directory. The Asia
+serve immutable version directories with byte-range support, but neither is a
+checksum trust root. Mirror operators must stage a complete release, validate
+the GitHub `SHA256SUMS.txt` and `SHA256SUMS-linux.txt`, and only then publish the
+version directory. The Asia
 mirror shares Caddy with the archive seed but uses a separate read-only
 `/downloads/*` handler; `/v2/*` continues to proxy only to the loopback node.
 
@@ -325,7 +326,7 @@ Remove-Item Env:\ENTCOIN_WALLET_PASSWORD
 ```
 
 The migration preserves the old P-256 key and address but does not migrate its
-testnet chain. There is intentionally no CLI restore command in v1.0.15; start
+testnet chain. There is intentionally no CLI restore command in v1.1.0; start
 the mainnet desktop app and restore the backup from the Wallet view.
 
 ## Data directory
@@ -359,7 +360,7 @@ while the node is live can omit committed data still present in its WAL.
 
 ## Wallet backup and recovery
 
-### New v1.0.15 wallet
+### New v1.1.0 wallet
 
 1. Open **Wallet** and reveal the 24-word recovery phrase.
 2. Record the words in order on offline media. Do not store a screenshot or
@@ -437,7 +438,7 @@ For a v0.2 mnemonic wallet, record the known 24 words or export and verify an
 copy of the old directory; the command validates the key and creates verified
 local OS protection and portable encrypted copies before removing plaintext.
 
-Then start v1.0.15 normally and restore the phrase or `.entwallet` from the
+Then start v1.1.0 normally and restore the phrase or `.entwallet` from the
 desktop Wallet view. This recovers only the P-256 key and address. Mainnet
 balances, spendable outputs, confirmations, and history are derived solely from
 the mainnet chain and begin independently of every testnet balance.
