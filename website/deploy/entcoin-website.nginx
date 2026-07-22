@@ -75,6 +75,25 @@ server {
         limit_except GET { deny all; }
     }
 
+    location = /wallet {
+        return 308 /wallet/;
+    }
+
+    location ^~ /wallet/ {
+        root /var/www/entcoin-wallet/current;
+        index index.html;
+        try_files $uri $uri/ =404;
+
+        add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://node.entcoin.xyz https://template-chat.xyz; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(self), geolocation=(), microphone=(), payment=()" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Cache-Control "no-cache" always;
+    }
+
     location ~ ^/(?:README\.md|deploy/|tests/|tools/)(?:.*)$ {
         return 404;
     }

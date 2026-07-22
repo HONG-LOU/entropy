@@ -228,6 +228,10 @@ test("production nginx host isolates the website and read-only status proxy", as
   assert.match(nginx, /Accept-Ranges "bytes"/);
   assert.match(nginx, /max-age=31536000, immutable/);
   assert.match(nginx, /Content-Security-Policy/);
+  assert.match(nginx, /location \^~ \/wallet\//);
+  assert.match(nginx, /root \/var\/www\/entcoin-wallet\/current;/);
+  assert.match(nginx, /script-src 'self' 'wasm-unsafe-eval'/);
+  assert.match(nginx, /Permissions-Policy "camera=\(self\)/);
   assert.ok(nginx.includes(String.raw`location ~* \.mjs$ {`));
   assert.match(nginx, /location ~\* \\.mjs\$ \{[^}]*default_type application\/javascript;/s);
   assert.doesNotMatch(nginx, /entcoin-node/);
