@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="https://entcoin.xyz">官网</a> ·
   <a href="https://github.com/HONG-LOU/entcoin/releases/latest">下载</a> ·
   <a href="SECURITY.md">安全策略</a> · <a href="docs/README.md">技术文档</a>
 </p>
