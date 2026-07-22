@@ -61,6 +61,25 @@ type peersResponse struct {
 	Peers    []string `json:"peers"`
 }
 
+type walletUTXO struct {
+	TxID        string `json:"tx_id"`
+	OutputIndex uint32 `json:"output_index"`
+	Amount      uint64 `json:"amount"`
+	Address     string `json:"address"`
+}
+
+type walletResponse struct {
+	Protocol         string                     `json:"protocol"`
+	Height           uint64                     `json:"height"`
+	TipHash          string                     `json:"tip_hash"`
+	ChainWork        string                     `json:"chain_work"`
+	ConfirmedBalance uint64                     `json:"confirmed_balance"`
+	SpendableBalance uint64                     `json:"spendable_balance"`
+	UTXOs            []walletUTXO               `json:"utxos"`
+	UTXOsTruncated   bool                       `json:"utxos_truncated"`
+	History          []ledger.TransactionRecord `json:"history"`
+}
+
 type gossipMessage struct {
 	Type                 string                `json:"type"`
 	Protocol             string                `json:"protocol"`

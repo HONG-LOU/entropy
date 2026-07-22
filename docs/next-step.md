@@ -54,5 +54,5 @@
   richer transaction and coin-provenance details.
 - Add signed update notifications with tested rollback behavior while keeping
   installation an explicit user action.
-- Build a mobile watch-only wallet or remote signer that does not require the
-  phone to run a full chain database.
+- Add payment-request URIs, address labels, hardware-wallet handoff, and
+  reproducible deployment attestations to the mobile PWA wallet.

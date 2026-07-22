@@ -435,7 +435,7 @@ func (s *Service) Start(parent context.Context) error {
 	mux := http.NewServeMux()
 	s.registerProtocolHandlers(mux)
 	server := &http.Server{
-		Handler:           s.limitRequests(mux),
+		Handler:           s.limitRequests(s.browserAccess(mux)),
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ReadHeaderTimeout: 4 * time.Second,
 		ReadTimeout:       20 * time.Second,

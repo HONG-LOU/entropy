@@ -12,6 +12,8 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +28,9 @@ const (
 	maxMempoolSyncValidations     = 64
 	maxMempoolResponseBytes       = int64(maxMempoolSyncValidations)*maxTransactionMessageBytes + 64<<10
 	maxBlocksResponseBytes        = int64(maxBlockDownloadBatch)*maxBlockBodyBytes + 64<<10
+	maxWalletResponseBytes        = int64(4 << 20)
+	maxWalletUTXOs                = core.MaxTransactionInputs
+	maxWalletHistory              = 50
 	httpRequestsPerIPPerSecond    = float64(128)
 	httpRequestsPerIPBurst        = float64(256)
 	httpRequestRateStateRetention = 10 * time.Minute
@@ -38,6 +43,42 @@ type requestRateState struct {
 	tokens   float64
 	updated  time.Time
 	lastSeen time.Time
+}
+
+func browserOriginAllowed(origin string) bool {
+	if origin == "https://entcoin.xyz" || origin == "https://www.entcoin.xyz" || origin == "https://wallet.entcoin.xyz" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || parsed.User != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+func (s *Service) browserAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		origin := request.Header.Get("Origin")
+		if origin == "" {
+			next.ServeHTTP(writer, request)
+			return
+		}
+		if !browserOriginAllowed(origin) {
+			writeError(writer, http.StatusForbidden, fmt.Errorf("browser origin is not allowed"))
+			return
+		}
+		writer.Header().Set("Access-Control-Allow-Origin", origin)
+		writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		writer.Header().Set("Access-Control-Max-Age", "600")
+		writer.Header().Set("Vary", "Origin")
+		if request.Method == http.MethodOptions {
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(writer, request)
+	})
 }
 
 type resyncPause struct {
@@ -79,9 +120,44 @@ func (s *Service) registerProtocolHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v2/blocks", s.handleBlocks)
 	mux.HandleFunc("GET /v2/mempool", s.handleMempool)
 	mux.HandleFunc("GET /v2/peers", s.handlePeers)
+	mux.HandleFunc("GET /v2/wallet/{address}", s.handleWallet)
 	mux.HandleFunc("POST /v2/transactions", s.handleTransaction)
 	mux.HandleFunc("POST /v2/block", s.handleBlock)
 	mux.HandleFunc("GET /v2/p2p", s.handleWebSocket)
+}
+
+func (s *Service) handleWallet(writer http.ResponseWriter, request *http.Request) {
+	if !s.acquireHeavyRequest(request.Context()) {
+		writeError(writer, http.StatusServiceUnavailable, fmt.Errorf("node is busy serving wallet data"))
+		return
+	}
+	defer s.releaseHeavyRequest()
+	address := request.PathValue("address")
+	snapshot, err := s.ledger.ReadWalletSnapshot(request.Context(), address, maxWalletUTXOs, maxWalletHistory)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if core.ValidateAddress(address) != nil {
+			status = http.StatusBadRequest
+		}
+		writeError(writer, status, err)
+		return
+	}
+	utxos := make([]walletUTXO, 0, len(snapshot.UTXO))
+	for outpoint, output := range snapshot.UTXO {
+		utxos = append(utxos, walletUTXO{TxID: outpoint.TxID, OutputIndex: outpoint.Index, Amount: output.Amount, Address: output.Address})
+	}
+	sort.Slice(utxos, func(i, j int) bool {
+		if utxos[i].TxID == utxos[j].TxID {
+			return utxos[i].OutputIndex < utxos[j].OutputIndex
+		}
+		return utxos[i].TxID < utxos[j].TxID
+	})
+	writeBoundedJSON(writer, http.StatusOK, walletResponse{
+		Protocol: ledger.ProtocolName, Height: snapshot.Tip.Height, TipHash: snapshot.Tip.Hash,
+		ChainWork: snapshot.Tip.Work.String(), ConfirmedBalance: snapshot.ConfirmedBalance,
+		SpendableBalance: snapshot.SpendableBalance, UTXOs: utxos,
+		UTXOsTruncated: snapshot.UTXOTruncated, History: snapshot.History,
+	}, maxWalletResponseBytes)
 }
 
 func (s *Service) handleStatus(writer http.ResponseWriter, request *http.Request) {

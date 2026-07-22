@@ -15,6 +15,7 @@ implementation disagree.
 | [v1.1.0 security audit](security-audit-v1.1.0.md) | Audit scope, findings, mathematical checks, evidence, and residual risk |
 | [Security policy](../SECURITY.md) | Supported versions, reporting, disclosure, and user guidance |
 | [Roadmap](next-step.md) | Explicitly unfinished production-readiness work |
+| [移动 PWA 钱包](mobile-pwa.zh-CN.md) | 中文实现说明、安全边界、构建、安装与发布顺序 |
 | [Release notes](../RELEASE_NOTES.md) | Complete v1.1.0 release log and upgrade notes |
 
 ## 文档导航

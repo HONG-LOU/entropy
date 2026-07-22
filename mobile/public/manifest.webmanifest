@@ -1,0 +1,16 @@
+{
+  "name": "Entcoin 移动钱包",
+  "short_name": "Entcoin",
+  "description": "本地加密、自主管理的 Entcoin 钱包",
+  "id": "/wallet/",
+  "start_url": "/wallet/",
+  "scope": "/wallet/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0f12",
+  "theme_color": "#0b0f12",
+  "icons": [
+    { "src": "/wallet/icons/appicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/wallet/icons/appicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

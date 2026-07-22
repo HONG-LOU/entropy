@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Entcoin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://node.entcoin.xyz https://template-chat.xyz; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/appicon-192.png" />
+    <link rel="icon" href="%BASE_URL%icons/appicon-192.png" />
+    <title>Entcoin 钱包</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand"><img src="%BASE_URL%icons/appicon-192.png" alt="" /><span>Entcoin</span><small>移动钱包</small></div>
+        <div class="node-state" id="nodeState"><i data-lucide="circle-dot"></i><span>正在连接</span></div>
+      </header>
+
+      <main id="main">
+        <section class="gate" id="loadingView">
+          <div class="spinner" aria-label="正在加载"></div><p>正在启动本地安全钱包</p>
+        </section>
+
+        <section class="gate" id="onboardingView" hidden>
+          <div class="gate-mark"><img src="%BASE_URL%icons/appicon-512.png" alt="Entcoin" /></div>
+          <h1>你的 ENT，由你保管</h1>
+          <p>密钥仅在这台设备中加密保存。开始前请确认你能安全备份 24 个恢复词。</p>
+          <div class="gate-actions">
+            <button class="primary" id="createStart"><i data-lucide="plus"></i>创建钱包</button>
+            <button class="secondary" id="restoreStart"><i data-lucide="key-round"></i>恢复钱包</button>
+          </div>
+        </section>
+
+        <section class="gate compact" id="unlockView" hidden>
+          <div class="gate-icon"><i data-lucide="lock-keyhole"></i></div>
+          <h1>解锁钱包</h1>
+          <p class="mono address-preview" id="unlockAddress"></p>
+          <form id="unlockForm" class="stack-form">
+            <label>钱包密码<input id="unlockPassword" type="password" autocomplete="current-password" minlength="12" required /></label>
+            <button class="primary" type="submit"><i data-lucide="unlock"></i>解锁</button>
+          </form>
+        </section>
+
+        <section class="wallet" id="walletView" hidden>
+          <div class="balance-band">
+            <div class="balance-head"><span>可用余额</span><button class="icon-button" id="refreshButton" title="刷新"><i data-lucide="refresh-cw"></i></button></div>
+            <div class="balance"><strong id="balanceValue">0</strong><span>ENT</span></div>
+            <div class="balance-meta"><span id="confirmedValue">已确认 0 ENT</span><span id="tipValue">区块 --</span></div>
+            <div class="quick-actions">
+              <button id="receiveButton"><span><i data-lucide="arrow-down-left"></i></span>收款</button>
+              <button id="sendButton"><span><i data-lucide="arrow-up-right"></i></span>发送</button>
+              <button id="backupButton"><span><i data-lucide="shield-check"></i></span>备份</button>
+              <button id="lockButton"><span><i data-lucide="lock"></i></span>锁定</button>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="section-title"><h2>最近活动</h2><span id="syncTime">尚未同步</span></div>
+            <div class="transactions" id="transactions"></div>
+            <div class="empty" id="emptyHistory"><i data-lucide="receipt-text"></i><strong>还没有交易</strong><span>收到或发出 ENT 后会显示在这里</span></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="setupDialog">
+      <form method="dialog" class="dialog-shell" id="setupForm">
+        <div class="dialog-head"><div><small id="setupStep">创建钱包</small><h2 id="setupTitle">设置钱包密码</h2></div><button class="icon-button" value="cancel" title="关闭"><i data-lucide="x"></i></button></div>
+        <div id="passwordPanel" class="panel-body stack-form">
+          <p>至少 12 个字符。此密码只用于解锁当前设备中的加密钱包。</p>
+          <label>钱包密码<input id="setupPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" /></label>
+          <label>确认密码<input id="setupPasswordConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" /></label>
+          <label id="mnemonicInputLabel" hidden>24 个恢复词<textarea id="mnemonicInput" rows="5" autocomplete="off" spellcheck="false"></textarea></label>
+          <button class="primary" id="setupContinue" type="button">继续</button>
+        </div>
+        <div id="mnemonicPanel" class="panel-body" hidden>
+          <div class="warning"><i data-lucide="triangle-alert"></i><span>恢复词等同于全部资产。不要截图、不要发给任何人。</span></div>
+          <ol class="words" id="mnemonicWords"></ol>
+          <label class="confirm-row"><input id="mnemonicConfirmed" type="checkbox" />我已离线抄写并核对恢复词</label>
+          <button class="primary" id="finishCreate" type="button" disabled>完成创建</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="receiveDialog">
+      <div class="dialog-shell"><div class="dialog-head"><div><small>收款</small><h2>我的地址</h2></div><button class="icon-button dialog-close" title="关闭"><i data-lucide="x"></i></button></div>
+        <div class="panel-body receive-body"><canvas id="receiveQR"></canvas><p class="mono full-address" id="receiveAddress"></p><button class="secondary" id="copyAddress"><i data-lucide="copy"></i>复制地址</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="sendDialog">
+      <form class="dialog-shell" id="sendForm">
+        <div class="dialog-head"><div><small>转账</small><h2>发送 ENT</h2></div><button type="button" class="icon-button dialog-close" title="关闭"><i data-lucide="x"></i></button></div>
+        <div class="panel-body stack-form" id="sendFields">
+          <label>收款地址<span class="input-action"><input id="sendAddress" class="mono" autocomplete="off" required /><button type="button" id="scanButton" title="扫描二维码"><i data-lucide="scan-line"></i></button></span></label>
+          <label>金额（ENT）<input id="sendAmount" inputmode="decimal" placeholder="0.00" required /></label>
+          <label>手续费（ENT）<input id="sendFee" inputmode="decimal" value="0.00001" required /></label>
+          <button class="primary" type="submit">核对交易</button>
+        </div>
+        <div class="panel-body review" id="sendReview" hidden>
+          <dl><div><dt>发送</dt><dd><strong id="reviewAmount"></strong> ENT</dd></div><div><dt>手续费</dt><dd><span id="reviewFee"></span> ENT</dd></div><div><dt>收款地址</dt><dd class="mono" id="reviewAddress"></dd></div></dl>
+          <div class="warning" id="nodeWarning" hidden><i data-lucide="triangle-alert"></i><span>两个节点的链尖不一致，请刷新后再确认。</span></div>
+          <button class="primary danger" id="confirmSend" type="button">签名并广播</button><button class="secondary" id="editSend" type="button">返回修改</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="backupDialog">
+      <div class="dialog-shell"><div class="dialog-head"><div><small>安全</small><h2>加密备份</h2></div><button class="icon-button dialog-close" title="关闭"><i data-lucide="x"></i></button></div>
+        <div class="panel-body stack-form"><p>导出文件仍受钱包密码保护。恢复词才是最终恢复方式。</p><label>钱包密码<input id="backupPassword" type="password" autocomplete="current-password" minlength="12" /></label><button class="primary" id="exportBackup"><i data-lucide="download"></i>导出 .entwallet</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="scannerDialog">
+      <div class="dialog-shell scanner-shell"><div class="dialog-head"><div><small>相机</small><h2>扫描收款码</h2></div><button class="icon-button dialog-close" title="关闭"><i data-lucide="x"></i></button></div>
+        <div class="scanner-frame"><video id="scannerVideo" playsinline></video><div class="scan-guide"></div></div>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

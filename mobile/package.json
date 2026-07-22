@@ -1,0 +1,25 @@
+{
+  "name": "entcoin-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build:wasm": "../scripts/build-mobile-wasm.sh",
+    "build": "npm run build:wasm && vite build",
+    "build:web": "vite build",
+    "test": "node --test tests/*.test.mjs",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "lucide": "^0.468.0",
+    "qrcode": "^1.5.4",
+    "qr-scanner": "^1.4.2"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}
