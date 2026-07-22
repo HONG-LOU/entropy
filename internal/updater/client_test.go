@@ -187,7 +187,11 @@ func TestNewPrefersAsianMirror(t *testing.T) {
 	if len(selection.artifact.URLs) != 3 || !strings.HasPrefix(selection.artifact.URLs[0], wantPrefix) {
 		t.Fatalf("artifact sources = %v", selection.artifact.URLs)
 	}
-	githubChecksum := "https://github.com/HONG-LOU/entcoin/releases/download/v" + testReleaseVersion + "/SHA256SUMS-linux.txt"
+	_, checksumName, err := assetNames(client.platform, client.architecture, testReleaseVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubChecksum := "https://github.com/HONG-LOU/entcoin/releases/download/v" + testReleaseVersion + "/" + checksumName
 	if len(selection.checksum.URLs) != 1 || selection.checksum.URLs[0] != githubChecksum {
 		t.Fatalf("checksum sources = %v", selection.checksum.URLs)
 	}

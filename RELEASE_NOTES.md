@@ -16,9 +16,10 @@ v1.0.x nodes can upgrade in place without moving chain or wallet data.
   installs only bytes matching the GitHub checksum.
 - Upgraded `golang.org/x/crypto` to `v0.52.0` and `golang.org/x/sys` to
   `v0.45.0`. `govulncheck` reports no vulnerabilities in reachable code.
-- Pinned every GitHub Action to an immutable commit, reduced release-token
-  permissions, added race and vulnerability gates, and enabled npm dependency
-  auditing in CI.
+- Pinned every GitHub Action to an immutable commit, upgraded JavaScript
+  Actions to maintained Node 24 runtimes, reduced release-token permissions,
+  added race and vulnerability gates, and enabled npm dependency auditing in
+  CI.
 - Added GitHub build-provenance attestations for every published artifact.
 - Fixed Linux package-directory modes at `0755`, added a build-time rejection
   for group/other-writable package directories, and stripped release CLI debug

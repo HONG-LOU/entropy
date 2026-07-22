@@ -24,8 +24,9 @@ compatibility boundary; a `mainnet` identity is not a security or audit claim.
   matching checksum supplied by a compromised mirror are not trusted.
 - Upgraded `golang.org/x/crypto` to v0.52.0 and `golang.org/x/sys` to v0.45.0;
   reachable-code vulnerability scanning reports zero vulnerabilities.
-- Pinned all GitHub Actions to immutable commit SHAs, reduced release workflow
-  permissions, and added Go race, `govulncheck`, and npm audit CI gates.
+- Pinned all GitHub Actions to immutable commit SHAs, moved JavaScript Actions
+  to maintained Node 24 runtimes, reduced release workflow permissions, and
+  added Go race, `govulncheck`, and npm audit CI gates.
 - Fixed Linux package directories to explicit non-writable `0755` modes instead
   of inheriting the build host's umask, and added a pre-package permission gate.
 
