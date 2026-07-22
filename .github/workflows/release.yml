@@ -43,7 +43,7 @@ jobs:
           ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.ENTCOIN_WINDOWS_CERTIFICATE_PASSWORD }}
           ENTCOIN_WINDOWS_TIMESTAMP_URL: ${{ vars.ENTCOIN_WINDOWS_TIMESTAMP_URL }}
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: entcoin-windows-amd64
           if-no-files-found: error
@@ -93,7 +93,7 @@ jobs:
           sudo apt-get install -y ./build/bin/entcoin_*_amd64.deb
           dbus-run-session -- ./scripts/smoke-linux-wallet.sh /usr/bin/entcoin-cli /tmp/entcoin-wallet-smoke
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: entcoin-linux-amd64
           if-no-files-found: error
