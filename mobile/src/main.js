@@ -2,16 +2,17 @@ import "./style.css";
 import QRCode from "qrcode";
 import QrScanner from "qr-scanner";
 import {
-  ArrowDownLeft, ArrowUpRight, CircleDot, Copy, Download, KeyRound, Lock,
+  ArrowDownLeft, ArrowUpRight, ChevronRight, CircleDot, Copy, Download, KeyRound, Languages, Lock,
   LockKeyhole, Plus, ReceiptText, RefreshCw, ScanLine, ShieldCheck,
   TriangleAlert, Unlock, X, createIcons,
 } from "lucide";
+import { detectLanguage, saveLanguage, translate } from "./i18n.js";
 import { loadVault, saveVault } from "./storage.js";
 import { walletCall } from "./vault-client.js";
 import { broadcastTransaction, loadWalletSnapshot } from "./api.js";
 import { formatAmount, parseAmount } from "./amount.js";
 
-createIcons({ icons: { ArrowDownLeft, ArrowUpRight, CircleDot, Copy, Download, KeyRound, Lock, LockKeyhole, Plus, ReceiptText, RefreshCw, ScanLine, ShieldCheck, TriangleAlert, Unlock, X } });
+createIcons({ icons: { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleDot, Copy, Download, KeyRound, Languages, Lock, LockKeyhole, Plus, ReceiptText, RefreshCw, ScanLine, ShieldCheck, TriangleAlert, Unlock, X } });
 
 const $ = (selector) => document.querySelector(selector);
 const views = ["#loadingView", "#onboardingView", "#unlockView", "#walletView"];
@@ -20,6 +21,38 @@ let snapshot;
 let pendingSetup;
 let pendingTransaction;
 let scanner;
+let language = detectLanguage();
+let lastSyncTime;
+let currentNodeState = { kind: "", key: "connecting", values: {} };
+let selectedTransaction;
+
+const tr = (key, values) => translate(language, key, values);
+const locale = () => language === "zh" ? "zh-CN" : "en-US";
+
+function applyLanguage() {
+  document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  document.title = tr("documentTitle");
+  document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = tr(element.dataset.i18n); });
+  for (const attribute of ["title", "aria-label", "placeholder"]) {
+    document.querySelectorAll(`[data-i18n-${attribute}]`).forEach((element) => {
+      element.setAttribute(attribute, tr(element.dataset[`i18n${attribute.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join("")}`]));
+    });
+  }
+  const button = $("#languageButton");
+  button.querySelector("span").textContent = language === "zh" ? "EN" : "中";
+  button.title = tr("language");
+  button.setAttribute("aria-label", tr("language"));
+  updateNodeState();
+  renderSnapshot();
+  if (pendingSetup) updateSetupHeadings();
+  if (selectedTransaction && $("#transactionDialog").open) renderTransactionDetails(selectedTransaction);
+}
+
+function switchLanguage() {
+  language = language === "zh" ? "en" : "zh";
+  saveLanguage(language);
+  applyLanguage();
+}
 
 function showView(selector) {
   for (const view of views) $(view).hidden = view !== selector;
@@ -39,9 +72,15 @@ function setBusy(button, busy) {
   button.classList.toggle("busy", busy);
 }
 
-function setNodeState(kind, label) {
+function setNodeState(kind, key, values = {}) {
+  currentNodeState = { kind, key, values };
+  updateNodeState();
+}
+
+function updateNodeState() {
+  const { kind, key, values } = currentNodeState;
   $("#nodeState").className = `node-state ${kind}`;
-  $("#nodeState span").textContent = label;
+  $("#nodeState span").textContent = tr(key, values);
 }
 
 async function initialize() {
@@ -55,7 +94,7 @@ async function initialize() {
     }
   } catch (error) {
     showView("#onboardingView");
-    toast(`无法读取本地钱包：${error.message}`, true);
+    toast(tr("readVaultError", { message: error.message }), true);
   }
   registerServiceWorker();
 }
@@ -64,8 +103,7 @@ function openSetup(mode) {
   pendingSetup = { mode };
   $("#passwordPanel").hidden = false;
   $("#mnemonicPanel").hidden = true;
-  $("#setupStep").textContent = mode === "create" ? "创建钱包" : "恢复钱包";
-  $("#setupTitle").textContent = mode === "create" ? "设置钱包密码" : "输入恢复信息";
+  updateSetupHeadings();
   $("#mnemonicInputLabel").hidden = mode !== "restore";
   $("#setupPassword").value = "";
   $("#setupPasswordConfirm").value = "";
@@ -73,11 +111,16 @@ function openSetup(mode) {
   $("#setupDialog").showModal();
 }
 
+function updateSetupHeadings() {
+  $("#setupStep").textContent = tr(pendingSetup.mode === "create" ? "createWallet" : "restoreWallet");
+  $("#setupTitle").textContent = tr(pendingSetup.result ? "backupWords" : pendingSetup.mode === "create" ? "setPassword" : "restoreInfo");
+}
+
 async function continueSetup() {
   const button = $("#setupContinue");
   const password = $("#setupPassword").value;
   if (password.length < 12 || password !== $("#setupPasswordConfirm").value) {
-    toast(password.length < 12 ? "密码至少需要 12 个字符" : "两次输入的密码不一致", true);
+    toast(tr(password.length < 12 ? "passwordTooShort" : "passwordMismatch"), true);
     return;
   }
   setBusy(button, true);
@@ -104,7 +147,7 @@ async function continueSetup() {
   $("#finishCreate").disabled = true;
   $("#passwordPanel").hidden = true;
   $("#mnemonicPanel").hidden = false;
-  $("#setupTitle").textContent = "备份恢复词";
+  updateSetupHeadings();
 }
 
 async function finishSetup() {
@@ -114,7 +157,7 @@ async function finishSetup() {
   $("#setupDialog").close();
   $("#receiveAddress").textContent = result.address;
   showView("#walletView");
-  toast(pendingSetup.mode === "create" ? "钱包已创建" : "钱包已恢复");
+  toast(tr(pendingSetup.mode === "create" ? "walletCreated" : "walletRestored"));
   pendingSetup = undefined;
   await refreshWallet();
 }
@@ -140,28 +183,34 @@ async function lockWallet() {
   snapshot = undefined;
   $("#unlockAddress").textContent = vaultRecord.address;
   showView("#unlockView");
-  toast("钱包已锁定");
+  toast(tr("walletLocked"));
 }
 
 async function refreshWallet() {
   const button = $("#refreshButton");
   setBusy(button, true);
-  setNodeState("loading", "正在同步");
+  setNodeState("loading", "syncing");
   try {
     snapshot = await loadWalletSnapshot(vaultRecord.address);
-    $("#balanceValue").textContent = formatAmount(snapshot.spendable_balance);
-    $("#confirmedValue").textContent = `已确认 ${formatAmount(snapshot.confirmed_balance)} ENT`;
-    $("#tipValue").textContent = `区块 ${snapshot.height.toLocaleString("zh-CN")}`;
-    $("#syncTime").textContent = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-    setNodeState(snapshot.tipsAgree ? "online" : "warning", snapshot.tipsAgree ? `${snapshot.nodesOnline} 个节点一致` : `${snapshot.nodesOnline} 个节点在线`);
-    renderHistory(snapshot.history || []);
-    if (snapshot.utxos_truncated) toast("可花费输出超过 256 个，请先在桌面钱包中归集", true);
+    lastSyncTime = new Date();
+    renderSnapshot();
+    setNodeState(snapshot.tipsAgree ? "online" : "warning", snapshot.tipsAgree ? "nodesAgree" : "nodesOnline", { count: snapshot.nodesOnline });
+    if (snapshot.utxos_truncated) toast(tr("utxosTruncated"), true);
   } catch (error) {
-    setNodeState("offline", "节点离线");
-    toast(error.message, true);
+    setNodeState("offline", "nodeOffline");
+    toast(localizeError(error.message), true);
   } finally {
     setBusy(button, false);
   }
+}
+
+function renderSnapshot() {
+  if (!snapshot) return;
+  $("#balanceValue").textContent = formatAmount(snapshot.spendable_balance);
+  $("#confirmedValue").textContent = tr("confirmedBalance", { amount: formatAmount(snapshot.confirmed_balance) });
+  $("#tipValue").textContent = tr("blockHeight", { height: Number(snapshot.height).toLocaleString(locale()) });
+  if (lastSyncTime) $("#syncTime").textContent = lastSyncTime.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  renderHistory(snapshot.history || []);
 }
 
 function renderHistory(history) {
@@ -169,24 +218,122 @@ function renderHistory(history) {
   container.replaceChildren(...history.map((record) => {
     const sent = Number(record.sent) > 0;
     const amount = sent ? Math.max(0, Number(record.sent) - Number(record.received)) : Number(record.received);
-    const row = document.createElement("div");
+    const row = document.createElement("button");
+    row.type = "button";
     row.className = "transaction-row";
+    row.addEventListener("click", () => showTransactionDetails(record));
     const icon = document.createElement("span");
     icon.className = sent ? "tx-icon sent" : "tx-icon received";
     icon.textContent = sent ? "↗" : "↙";
     const details = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = record.coinbase ? "挖矿奖励" : sent ? "已发送" : "已收到";
+    title.textContent = tr(record.coinbase ? "miningReward" : sent ? "sent" : "received");
     const meta = document.createElement("span");
-    meta.textContent = record.pending ? "等待确认" : new Date(record.timestamp * 1000).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    meta.textContent = record.pending ? tr("pending") : formatTransactionTime(record.timestamp, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     details.append(title, meta);
     const value = document.createElement("div");
     value.className = sent ? "tx-value sent" : "tx-value";
     value.textContent = `${sent ? "−" : "+"}${formatAmount(amount)} ENT`;
-    row.append(icon, details, value);
+    const arrow = document.createElement("i");
+    arrow.dataset.lucide = "chevron-right";
+    arrow.className = "tx-chevron";
+    row.append(icon, details, value, arrow);
     return row;
   }));
+  createIcons({ icons: { ChevronRight } });
   $("#emptyHistory").hidden = history.length > 0;
+}
+
+function formatTransactionTime(timestamp, options = {}) {
+  if (!timestamp) return tr("unavailable");
+  return new Date(Number(timestamp) * 1000).toLocaleString(locale(), options);
+}
+
+function appendDetailRow(container, labelKey, value, mono = false) {
+  const row = document.createElement("div");
+  row.className = "detail-row";
+  const label = document.createElement("dt");
+  label.textContent = tr(labelKey);
+  const content = document.createElement("dd");
+  content.textContent = value ?? tr("unavailable");
+  if (mono) content.classList.add("mono");
+  row.append(label, content);
+  container.append(row);
+  return content;
+}
+
+function appendTransactionSection(container, titleKey, items, kind) {
+  const section = document.createElement("section");
+  const title = document.createElement("h3");
+  title.textContent = tr(titleKey);
+  section.append(title);
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "detail-empty";
+    empty.textContent = tr(kind === "input" ? "noInputs" : "noOutputs");
+    section.append(empty);
+  }
+  items.forEach((item, index) => {
+    const group = document.createElement("dl");
+    group.className = "detail-group";
+    const heading = document.createElement("strong");
+    heading.textContent = kind === "input" ? `${tr("inputs")} ${index + 1}` : tr("output", { index: index + 1 });
+    group.append(heading);
+    if (kind === "input") {
+      appendDetailRow(group, "outpoint", `${item.tx_id}:${item.output_index}`, true);
+    } else {
+      appendDetailRow(group, "amount", `${formatAmount(item.amount)} ENT`);
+      appendDetailRow(group, "address", item.address, true);
+    }
+    section.append(group);
+  });
+  container.append(section);
+}
+
+function renderTransactionDetails(record) {
+  const container = $("#transactionDetails");
+  container.replaceChildren();
+  const transaction = record.transaction || {};
+  const transactionId = transaction.id || record.id || tr("unavailable");
+  const sent = Number(record.sent) > 0;
+  const summary = document.createElement("dl");
+  summary.className = "detail-summary";
+  appendDetailRow(summary, "status", `${tr(record.coinbase ? "miningReward" : sent ? "sent" : "received")} · ${tr(record.pending ? "pending" : "confirmed")}`);
+  appendDetailRow(summary, "time", formatTransactionTime(record.timestamp, { dateStyle: "medium", timeStyle: "short" }));
+  appendDetailRow(summary, "confirmations", tr("confirmationsCount", { count: Number(record.confirmations || 0).toLocaleString(locale()) }));
+  const idContent = appendDetailRow(summary, "transactionId", transactionId, true);
+  if (transactionId !== tr("unavailable")) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "detail-copy";
+    copy.title = tr("copyTransactionId");
+    copy.setAttribute("aria-label", tr("copyTransactionId"));
+    copy.innerHTML = '<i data-lucide="copy"></i>';
+    copy.addEventListener("click", async () => { await navigator.clipboard.writeText(transactionId); toast(tr("transactionIdCopied")); });
+    idContent.append(copy);
+  }
+  if (record.block_height !== undefined && record.block_height !== null) appendDetailRow(summary, "block", Number(record.block_height).toLocaleString(locale()));
+  if (record.block_hash) appendDetailRow(summary, "blockHash", record.block_hash, true);
+  if (record.position !== undefined && record.position !== null) appendDetailRow(summary, "position", Number(record.position).toLocaleString(locale()));
+  appendDetailRow(summary, "receivedTotal", `${formatAmount(record.received)} ENT`);
+  appendDetailRow(summary, "sentTotal", `${formatAmount(record.sent)} ENT`);
+  container.append(summary);
+  if (record.pruned) {
+    const notice = document.createElement("p");
+    notice.className = "detail-notice";
+    notice.textContent = tr("prunedDetails");
+    container.append(notice);
+  } else {
+    appendTransactionSection(container, "inputs", transaction.inputs || [], "input");
+    appendTransactionSection(container, "outputs", transaction.outputs || [], "output");
+  }
+  createIcons({ icons: { Copy } });
+}
+
+function showTransactionDetails(record) {
+  selectedTransaction = record;
+  renderTransactionDetails(record);
+  $("#transactionDialog").showModal();
 }
 
 async function showReceive() {
@@ -205,13 +352,13 @@ function openSend() {
 async function reviewSend(event) {
   event.preventDefault();
   if (!snapshot) {
-    toast("请先刷新钱包余额", true);
+    toast(tr("refreshFirst"), true);
     return;
   }
   try {
     const to = $("#sendAddress").value.trim();
     const valid = await walletCall({ action: "validate_address", to });
-    if (!valid.ok) throw new Error("收款地址无效");
+    if (!valid.ok) throw new Error(tr("invalidAddress"));
     const amount = parseAmount($("#sendAmount").value);
     const fee = parseAmount($("#sendFee").value);
     pendingTransaction = { to, amount, fee };
@@ -223,7 +370,7 @@ async function reviewSend(event) {
     $("#sendFields").hidden = true;
     $("#sendReview").hidden = false;
   } catch (error) {
-    toast(error.message, true);
+    toast(localizeError(error.message), true);
   }
 }
 
@@ -237,10 +384,10 @@ async function confirmSend() {
     $("#sendDialog").close();
     $("#sendForm").reset();
     $("#sendFee").value = "0.00001";
-    toast(`交易已广播：${accepted.transaction_id.slice(0, 10)}…`);
+    toast(tr("broadcasted", { id: accepted.transaction_id.slice(0, 10) }));
     await refreshWallet();
   } catch (error) {
-    toast(error.message, true);
+    toast(localizeError(error.message), true);
   } finally {
     setBusy(button, false);
   }
@@ -263,7 +410,7 @@ async function exportBackup() {
   link.click();
   URL.revokeObjectURL(link.href);
   $("#backupDialog").close();
-  toast("加密备份已导出");
+  toast(tr("backupExported"));
 }
 
 async function startScanner() {
@@ -278,7 +425,7 @@ async function startScanner() {
     await scanner.start();
   } catch {
     stopScanner();
-    toast("无法使用相机，请检查 Safari 相机权限", true);
+    toast(tr("cameraError"), true);
   }
 }
 
@@ -289,11 +436,21 @@ function stopScanner() {
 }
 
 function localizeWalletError(message = "") {
-  if (message.includes("authentication failed")) return "密码错误或钱包数据已损坏";
-  if (message.includes("password does not meet policy")) return "密码至少需要 12 个字符";
-  if (message.includes("invalid 24-word")) return "恢复词无效，请核对 24 个英文单词";
-  if (message.includes("insufficient funds")) return "可用余额不足以支付金额和手续费";
-  return message || "钱包操作失败";
+  if (message.includes("authentication failed")) return tr("authFailed");
+  if (message.includes("password does not meet policy")) return tr("passwordTooShort");
+  if (message.includes("invalid 24-word")) return tr("invalidMnemonic");
+  if (message.includes("insufficient funds")) return tr("insufficientFunds");
+  return localizeError(message) || tr("walletOperationFailed");
+}
+
+function localizeError(message = "") {
+  if (message.includes("金额格式无效")) return tr("invalidAmount");
+  if (message.includes("金额超出允许范围")) return tr("amountOutOfRange");
+  if (message.includes("暂时无法连接 Entcoin 节点")) return tr("nodesUnavailable");
+  if (message.includes("交易广播失败")) return tr("broadcastFailed");
+  const httpStatus = message.match(/节点返回 HTTP (\d+)/)?.[1];
+  if (httpStatus) return tr("nodeHttpError", { status: httpStatus });
+  return message;
 }
 
 async function registerServiceWorker() {
@@ -303,6 +460,7 @@ async function registerServiceWorker() {
 }
 
 $("#createStart").addEventListener("click", () => openSetup("create"));
+$("#languageButton").addEventListener("click", switchLanguage);
 $("#restoreStart").addEventListener("click", () => openSetup("restore"));
 $("#setupContinue").addEventListener("click", continueSetup);
 $("#mnemonicConfirmed").addEventListener("change", (event) => { $("#finishCreate").disabled = !event.target.checked; });
@@ -319,7 +477,7 @@ $("#confirmSend").addEventListener("click", confirmSend);
 $("#editSend").addEventListener("click", () => { $("#sendFields").hidden = false; $("#sendReview").hidden = true; });
 $("#exportBackup").addEventListener("click", exportBackup);
 $("#scanButton").addEventListener("click", startScanner);
-$("#copyAddress").addEventListener("click", async () => { await navigator.clipboard.writeText(vaultRecord.address); toast("地址已复制"); });
+$("#copyAddress").addEventListener("click", async () => { await navigator.clipboard.writeText(vaultRecord.address); toast(tr("addressCopied")); });
 document.querySelectorAll(".dialog-close").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
 $("#scannerDialog").addEventListener("close", () => scanner?.destroy());
 document.addEventListener("visibilitychange", () => {
@@ -331,4 +489,5 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+applyLanguage();
 initialize();
